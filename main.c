@@ -20,7 +20,11 @@
 #include "Gap.h"
 #ifdef SMALL
 	#include "KWS_ds_cnn_s_quantKernels.h"
-#else
+#endif
+#ifdef MEDIUM
+    #include "KWS_ds_cnn_m_quantKernels.h"
+#endif
+#ifdef LARGE
 	#include "KWS_ds_cnn_l_quantKernels.h"
 #endif
 #include "gaplib/ImgIO.h"
@@ -65,22 +69,16 @@ void kws_ds_cnn(void)
     /* Input image size. */
     unsigned int W = AT_INPUT_WIDTH, H = AT_INPUT_HEIGHT;
     char *ImageFromFile = (char *) pi_l2_malloc(sizeof(KWS_IMAGE_IN_T) * W * H);
-    printf("=====>imageinfile %p\n", ImageFromFile);
-    if (ImageFromFile == NULL)
-    {
+    if (ImageFromFile == NULL){
         printf("Failed to allocate Memory for Image (%d bytes)\n", sizeof(KWS_IMAGE_IN_T) * W * H);
         pmsis_exit(-1);
     }
     printf("Reading image\n");
-
-    if (ReadImageFromFile(ImageName, W, H, 1, ImageFromFile, W*H*sizeof(KWS_IMAGE_IN_T), IMGIO_OUTPUT_CHAR, 0))
-    {
+    if (ReadImageFromFile(ImageName, W, H, 1, ImageFromFile, W*H*sizeof(KWS_IMAGE_IN_T), IMGIO_OUTPUT_CHAR, 0)){
         printf("Failed to load image %s or dimension mismatch Expects [%dx%d]\n", ImageName, W, H);
         pmsis_exit(-2);
     }
     printf("Finished reading image\n");
-
-    #define PRINT_IMAGE
     #ifdef PRINT_IMAGE
 	    for (int i=0; i<H; i++){
 	        for (int j=0; j<W; j++){
@@ -99,17 +97,17 @@ void kws_ds_cnn(void)
         pmsis_exit(-3);
     }
     
-    #if !defined(__EMUL__)
-    /* Configure And open cluster. */
-    struct pi_device cluster_dev;
-    struct pi_cluster_conf cl_conf;
-    cl_conf.id = 0;
-    pi_open_from_conf(&cluster_dev, (void *) &cl_conf);
-    if (pi_cluster_open(&cluster_dev))
-    {
-        printf("Cluster open failed !\n");
-        pmsis_exit(-4);
-    }
+    #ifndef __EMUL__
+        /* Configure And open cluster. */
+        struct pi_device cluster_dev;
+        struct pi_cluster_conf cl_conf;
+        cl_conf.id = 0;
+        pi_open_from_conf(&cluster_dev, (void *) &cl_conf);
+        if (pi_cluster_open(&cluster_dev))
+        {
+            printf("Cluster open failed !\n");
+            pmsis_exit(-4);
+        }
     #endif  /* __EMUL__ */
 
     printf("Constructor\n");
@@ -162,10 +160,10 @@ void kws_ds_cnn(void)
     __PREFIX(CNN_Destruct)();
     pi_l2_free(ResOut,12*sizeof(KWS_IMAGE_IN_T));
 
-#ifndef __EMUL__    
-    // Close the cluster
-    pi_cluster_close(&cluster_dev);
-#endif
+    #ifndef __EMUL__    
+        // Close the cluster
+        pi_cluster_close(&cluster_dev);
+    #endif
     printf("Ended\n");
     pmsis_exit(0);
 }

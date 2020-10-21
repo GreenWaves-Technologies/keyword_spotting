@@ -4,10 +4,31 @@
 # This software may be modified and distributed under the terms
 # of the BSD license.  See the LICENSE file for details.
 
-MODEL_PREFIX=KWS_ds_cnn_l_quant
+
+SMALL  ?= 0
+MEDIUM ?= 0
+LARGE  ?= 0
+ifeq ($(SMALL), 1)
+	MODEL_PREFIX = KWS_ds_cnn_s_quant
+	AT_INPUT_WIDTH=10
+	AT_INPUT_HEIGHT=49
+	APP_CFLAGS += -DSMALL
+else
+	ifeq ($(MEDIUM), 1)
+		MODEL_PREFIX = KWS_ds_cnn_m_quant
+		AT_INPUT_WIDTH=10
+		AT_INPUT_HEIGHT=49
+		APP_CFLAGS += -DMEDIUM
+	else
+	ifeq ($(LARGE), 1)
+		MODEL_PREFIX = KWS_ds_cnn_l_quant
+		AT_INPUT_WIDTH=40
+		AT_INPUT_HEIGHT=98
+		APP_CFLAGS += -DLARGE
+	endif
+endif
+endif
 MODEL_SQ8=1
-AT_INPUT_WIDTH=40
-AT_INPUT_HEIGHT=98
 RM=rm -f
 
 IMAGE = $(CURDIR)/samples/yes_features_int8.pgm
@@ -52,11 +73,6 @@ $(OBJS) : $(BUILD_DIR)/%.o : %.c
 
 $(MAIN): $(OBJS)
 	$(CC) $(CFLAGS) -MMD -MP $(CFLAGS) $(INCLUDES) -o $(MAIN) $(OBJS) $(LFLAGS) $(LIBS)
-
-ifdef LINK_IMAGE
-$(LINK_IMAGE_HEADER): $(LINK_IMAGE)
-	xxd -i $< $@
-endif
 
 clean: #clean_model
 	$(RM) -r $(BUILD_DIR)

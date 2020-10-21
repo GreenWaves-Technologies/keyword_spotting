@@ -4,11 +4,13 @@ import argparse
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
+import glob
 
 from tensorflow.contrib.framework.python.ops import audio_ops
 from tensorflow.python.ops import io_ops
 
 FLAGS = None
+NNTOOL_INPUT_SCALE = 1.9372712
 
 def filename(path):
 	return os.path.splitext(os.path.split(path)[1])[0]
@@ -69,52 +71,55 @@ def get_mfcc_graph(model_settings):
 def main(_):
 	model_settings = prepare_model_settings(
     	  FLAGS.sample_rate, FLAGS.clip_duration_ms, FLAGS.window_size_ms,
-	  	  FLAGS.window_stride_ms, FLAGS.feature_bin_count)
-	g, input_file_placeholder, tf_mfccs, signal = get_mfcc_graph(model_settings)
-	with tf.compat.v1.Session(graph=g) as sess:
-		tf_mfccs, signal = sess.run([tf_mfccs, signal], feed_dict={input_file_placeholder: FLAGS.input_file})
+	  	  FLAGS.window_stride_ms, FLAGS.dct_coefficient_count)
 
-	print(tf_mfccs.shape)
-
-	if FLAGS.tflite_model is not None:
-		interpreter = tf.lite.Interpreter(model_path=FLAGS.tflite_model)
-		interpreter.allocate_tensors()
-		
-		# Get input and output tensors.
-		input_details = interpreter.get_input_details()
-		output_details = interpreter.get_output_details()
-		print('Input details: ', input_details)
-		print('Output details: ', output_details)
-		scale, zero_point = input_details[0]['quantization']
-		np.array(tf_mfccs).astype(np.float32).tofile("samples/{}_features_float32.dat".format(filename(FLAGS.input_file)))
-		tf_mfccs_int8 = np.array(tf_mfccs / scale).astype(np.int8) # Scale to int8
-		np.array(tf_mfccs_int8).tofile("samples/{}_features_int8.dat".format(filename(FLAGS.input_file)))
-		with open("samples/{}_features_int8.pgm".format(filename(FLAGS.input_file)), 'wb') as f:
+	for input_file in glob.glob(FLAGS.input_file):
+		print(input_file)
+		g, input_file_placeholder, tf_mfccs, signal = get_mfcc_graph(model_settings)
+		with tf.compat.v1.Session(graph=g) as sess:
+			tf.initialize_all_variables().run()
+			tf_mfccs, signal = sess.run([tf_mfccs, signal], feed_dict={input_file_placeholder: input_file})
+			
+		print("\n\nFloat MFCC: [{}..{}] with shape [{}]".format(np.min(tf_mfccs), np.max(tf_mfccs), tf_mfccs.shape))
+		tf_mfccs.astype(np.float32).tofile("samples/{}_features_float32.dat".format(filename(input_file)))
+		tf_mfccs_int8 = np.floor(tf_mfccs.astype(np.float32) / NNTOOL_INPUT_SCALE + 0.5).astype(np.int8) # Scale to int8
+		np.array(tf_mfccs_int8).tofile("samples/{}_features_int8.dat".format(filename(input_file)))
+		with open("samples/{}_features_int8.pgm".format(filename(input_file)), 'wb') as f:
 			hdr =  'P5' + '\n' + str(tf_mfccs.shape[2]) + '  ' + str(tf_mfccs.shape[1]) + '  ' + str(255) + '\n'
 			f.write(hdr.encode())
 			np.int8(tf_mfccs_int8).tofile(f)
-		print(tf_mfccs_int8)
-		print(np.min(tf_mfccs_int8), np.max(tf_mfccs_int8))
-		if scale != 0.0:
-			input_array = np.array((tf_mfccs / scale) + zero_point).astype(np.uint8)
-		else:
-			input_array = np.array(tf_mfccs).astype(np.float32)
-		print(np.min(input_array), np.max(input_array))
-		print(input_array.shape)
+		print("Integer MFCC: [{}..{}] with shape [{}]".format(np.min(tf_mfccs_int8), np.max(tf_mfccs_int8), tf_mfccs_int8.shape))
 
-		interpreter.set_tensor(input_details[0]['index'], input_array.reshape(input_details[0]['shape']))
-		interpreter.invoke()
-		output = interpreter.get_tensor(output_details[0]['index'])
-		print("Predicted class:\t{}\nWith confidence:\t{}".format(np.argmax(output), output[0, np.argmax(output)]))
-		np.set_printoptions(threshold=sys.maxsize)
-		print("Predictions: ")
-		print(output)
+		if FLAGS.tflite_model is not None:
+			interpreter = tf.lite.Interpreter(model_path=FLAGS.tflite_model)
+			interpreter.allocate_tensors()
+			
+			# Get input and output tensors.
+			input_details = interpreter.get_input_details()
+			output_details = interpreter.get_output_details()
+			print('Input details: ', input_details)
+			print('Output details: ', output_details)
+			scale, zero_point = input_details[0]['quantization']
+
+			if scale != 0.0:
+				input_array = np.array(np.floor(tf_mfccs / scale + 0.5) + zero_point).astype(np.uint8)
+			else:
+				input_array = np.array(tf_mfccs).astype(np.float32)
+
+			interpreter.set_tensor(input_details[0]['index'], input_array.reshape(input_details[0]['shape']))
+			interpreter.invoke()
+			output = interpreter.get_tensor(output_details[0]['index'])
+			print("Predicted class:\t{}\nWith confidence:\t{}".format(np.argmax(output), output[0, np.argmax(output)]))
+			np.set_printoptions(threshold=sys.maxsize)
+			print("Predictions: ")
+			print(output)
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument(
 	  '--input_file',
 	  type=str,
+	  default='samples/*.wav',
 	  help='Input wav file',)
 	parser.add_argument(
 	  '--tflite_model',
@@ -147,7 +152,7 @@ if __name__ == '__main__':
 	  help='How far to move in time between spectrogram timeslices.',
 	)
 	parser.add_argument(
-	  '--feature_bin_count',
+	  '--dct_coefficient_count',
 	  type=int,
 	  default=40,
 	  help='How many bins to use for the MFCC fingerprint',

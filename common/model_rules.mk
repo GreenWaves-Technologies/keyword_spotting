@@ -51,13 +51,13 @@ $(MODEL_BUILD):
 $(MODEL_TFLITE): $(TRAINED_TFLITE_MODEL) | $(MODEL_BUILD)
 	cp $< $@
 
-# Creates an NNTOOL state file by running the commands in the script
+# Creates an Autotiler Model file by running the commands in the script
 # These commands could be run interactively
 # The commands:
 # 	Adjust the model to match AutoTiler tensor order
 #	Fuse nodes together to match fused AutoTiler generators
 #	Quantize the graph if not already done with tflite quantization
-#	Save the graph state files
+#	Generate the Autotiler model code
 
 # Runs NNTOOL with its state file to generate the autotiler model code
 $(MODEL_BUILD)/$(MODEL_SRC): $(MODEL_TFLITE) | $(MODEL_BUILD) $(SAMPLES)

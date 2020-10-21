@@ -8,23 +8,36 @@ ifndef GAP_SDK_HOME
   $(error Source sourceme in gap_sdk first)
 endif
 
-SMALL ?= 0
-ifeq ($(SMALL),1)
+SMALL  ?= 0
+MEDIUM ?= 0
+LARGE  ?= 0
+ifeq ($(SMALL), 1)
 	MODEL_PREFIX = KWS_ds_cnn_s_quant
+	AT_INPUT_WIDTH=10
+	AT_INPUT_HEIGHT=49
 	APP_CFLAGS += -DSMALL
 else
-	MODEL_PREFIX = KWS_ds_cnn_l_quant
+	ifeq ($(MEDIUM), 1)
+		MODEL_PREFIX = KWS_ds_cnn_m_quant
+		AT_INPUT_WIDTH=10
+		AT_INPUT_HEIGHT=49
+		APP_CFLAGS += -DMEDIUM
+	else
+	ifeq ($(LARGE), 1)
+		MODEL_PREFIX = KWS_ds_cnn_l_quant
+		AT_INPUT_WIDTH=40
+		AT_INPUT_HEIGHT=98
+		APP_CFLAGS += -DLARGE
+	endif
+endif
 endif
 MODEL_SQ8=1
-AT_INPUT_WIDTH=40
-AT_INPUT_HEIGHT=98
 pulpChip = GAP
 RM=rm -f
 
 IMAGE = $(CURDIR)/samples/on_sample_features_int8.pgm
 
 READFS_FILES=$(realpath $(MODEL_TENSORS))
-PLPBRIDGE_FLAGS = -f
 
 QUANT_BITS=8
 BUILD_DIR=BUILD
@@ -55,7 +68,7 @@ APP_CFLAGS += -DAT_IMAGE=$(IMAGE)
 # all depends on the model
 all:: model
 
-clean:: #clean_model
+clean:: clean_at_model
 
 clean_at_model:
 	$(RM) $(MODEL_GEN_EXE)
