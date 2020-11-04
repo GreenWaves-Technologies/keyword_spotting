@@ -28,6 +28,8 @@ else
 			AT_INPUT_WIDTH=40
 			AT_INPUT_HEIGHT=98
 			APP_CFLAGS += -DLARGE
+		else
+$(error You must set to 1 one of SMALL, MEDIUM, LARGE to select a network)
 		endif
 	endif
 endif

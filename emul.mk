@@ -6,7 +6,7 @@
 
 DUMP_TENSORS ?= 1
 SMALL  ?= 0
-MEDIUM ?= 0
+MEDIUM ?= 1
 LARGE  ?= 0
 ifeq ($(SMALL), 1)
 	MODEL_PREFIX = KWS_ds_cnn_s_quant
@@ -25,6 +25,8 @@ else
 			AT_INPUT_WIDTH=40
 			AT_INPUT_HEIGHT=98
 			CFLAGS += -DLARGE
+		else
+$(error You must set to 1 one of SMALL, MEDIUM, LARGE to select a network)
 		endif
 	endif
 endif
