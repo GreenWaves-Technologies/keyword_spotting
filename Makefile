@@ -9,7 +9,7 @@ ifndef GAP_SDK_HOME
 endif
 
 SMALL  ?= 0
-MEDIUM ?= 1
+MEDIUM ?= 0
 LARGE  ?= 0
 ifeq ($(SMALL), 1)
 	MODEL_PREFIX = KWS_ds_cnn_s_quant
@@ -38,6 +38,7 @@ pulpChip = GAP
 RM=rm -f
 
 IMAGE = $(CURDIR)/samples/on_sample_features_int8.pgm
+WAV_PATH = $(CURDIR)/samples/on_sample.wav
 
 READFS_FILES=$(realpath $(MODEL_TENSORS))
 
@@ -59,18 +60,22 @@ MODEL_SIZE_CFLAGS = -DAT_INPUT_HEIGHT=$(AT_INPUT_HEIGHT) -DAT_INPUT_WIDTH=$(AT_I
 
 include common/model_decl.mk
 
-APP_SRCS += main.c $(MODEL_GEN_C) $(MODEL_COMMON_SRCS) $(CNN_LIB)
+MAIN = main_with_mfcc.c # main.c
+APP_SRCS += $(MAIN) $(MODEL_GEN_C) $(MODEL_COMMON_SRCS) $(CNN_LIB) 
+APP_SRCS += common/wavIO.c $(MFCCBUILD_DIR)/MFCCKernels.c $(MFCC_DIR)/MfccBasicKernels.c $(MFCC_DIR)/FFTLib.c
 
 APP_CFLAGS += -O3 -s -mno-memcpy -fno-tree-loop-distribute-patterns 
 APP_CFLAGS += -I. -I$(MODEL_COMMON_INC) -I$(TILER_EMU_INC) -I$(TILER_INC) -I$(MODEL_BUILD) $(CNN_LIB_INCLUDE)
+APP_CFLAGS += -Icommon -I$(MFCC_DIR) -I$(MFCCBUILD_DIR) -I$(LUT_GEN_DIR)
 APP_CFLAGS += -DPERF -DAT_MODEL_PREFIX=$(MODEL_PREFIX) $(MODEL_SIZE_CFLAGS)
 APP_CFLAGS += -DSTACK_SIZE=$(CLUSTER_STACK_SIZE) -DSLAVE_STACK_SIZE=$(CLUSTER_SLAVE_STACK_SIZE)
-APP_CFLAGS += -DAT_IMAGE=$(IMAGE)
+APP_CFLAGS += -DAT_IMAGE=$(IMAGE) -DAT_WAV=$(WAV_PATH) -DPRINT_WAV
+
 
 # all depends on the model
-all:: model
+all:: model mfcc_model
 
-clean:: clean_at_model
+clean:: clean_at_model clean_mfcc_model
 
 clean_at_model:
 	$(RM) $(MODEL_GEN_EXE)
@@ -82,5 +87,6 @@ at_model:: $(MODEL_BUILD) $(MODEL_GEN_EXE)
 	$(MODEL_GEN_EXE) -o $(MODEL_BUILD) -c $(MODEL_BUILD) $(MODEL_GEN_EXTRA_FLAGS)
 
 include common/model_rules.mk
+include mfcc_model.mk
 
 include $(GAP_SDK_HOME)/tools/rules/pmsis_rules.mk
