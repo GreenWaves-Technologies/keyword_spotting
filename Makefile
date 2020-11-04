@@ -9,7 +9,7 @@ ifndef GAP_SDK_HOME
 endif
 
 SMALL  ?= 0
-MEDIUM ?= 0
+MEDIUM ?= 1
 LARGE  ?= 0
 ifeq ($(SMALL), 1)
 	MODEL_PREFIX = KWS_ds_cnn_s_quant
@@ -23,13 +23,13 @@ else
 		AT_INPUT_HEIGHT=49
 		APP_CFLAGS += -DMEDIUM
 	else
-	ifeq ($(LARGE), 1)
-		MODEL_PREFIX = KWS_ds_cnn_l_quant
-		AT_INPUT_WIDTH=40
-		AT_INPUT_HEIGHT=98
-		APP_CFLAGS += -DLARGE
+		ifeq ($(LARGE), 1)
+			MODEL_PREFIX = KWS_ds_cnn_l_quant
+			AT_INPUT_WIDTH=40
+			AT_INPUT_HEIGHT=98
+			APP_CFLAGS += -DLARGE
+		endif
 	endif
-endif
 endif
 MODEL_SQ8=1
 pulpChip = GAP

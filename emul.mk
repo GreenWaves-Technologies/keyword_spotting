@@ -4,7 +4,7 @@
 # This software may be modified and distributed under the terms
 # of the BSD license.  See the LICENSE file for details.
 
-
+DUMP_TENSORS ?= 1
 SMALL  ?= 0
 MEDIUM ?= 0
 LARGE  ?= 0
@@ -12,21 +12,21 @@ ifeq ($(SMALL), 1)
 	MODEL_PREFIX = KWS_ds_cnn_s_quant
 	AT_INPUT_WIDTH=10
 	AT_INPUT_HEIGHT=49
-	APP_CFLAGS += -DSMALL
+	CFLAGS += -DSMALL
 else
 	ifeq ($(MEDIUM), 1)
 		MODEL_PREFIX = KWS_ds_cnn_m_quant
 		AT_INPUT_WIDTH=10
 		AT_INPUT_HEIGHT=49
-		APP_CFLAGS += -DMEDIUM
+		CFLAGS += -DMEDIUM
 	else
-	ifeq ($(LARGE), 1)
-		MODEL_PREFIX = KWS_ds_cnn_l_quant
-		AT_INPUT_WIDTH=40
-		AT_INPUT_HEIGHT=98
-		APP_CFLAGS += -DLARGE
+		ifeq ($(LARGE), 1)
+			MODEL_PREFIX = KWS_ds_cnn_l_quant
+			AT_INPUT_WIDTH=40
+			AT_INPUT_HEIGHT=98
+			CFLAGS += -DLARGE
+		endif
 	endif
-endif
 endif
 MODEL_SQ8=1
 RM=rm -f
@@ -37,7 +37,9 @@ QUANT_BITS=8
 BUILD_DIR=BUILD
 
 NNTOOL_SCRIPT_PARAMETRIC=model/nntool_script_params
-NNTOOL_SET_GRAPH_DUMP = set graph_dump_tensor 7
+ifeq ($(DUMP_TENOSRS), 1)
+	NNTOOL_SET_GRAPH_DUMP = set graph_dump_tensor 7
+endif
 NNTOOL_EXTRA_FLAGS = -q
 MODEL_SUFFIX = _$(QUANT_BITS)BIT_EMUL
 
@@ -53,7 +55,7 @@ include common/model_decl.mk
 
 MODEL_GEN_EXTRA_FLAGS= -f $(MODEL_BUILD)
 CC = gcc
-CFLAGS   += -g -O0 -D__EMUL__ $(MODEL_SIZE_CFLAGS)
+CFLAGS   += -g -O3 -D__EMUL__ $(MODEL_SIZE_CFLAGS)
 INCLUDES  = -I. -I$(TILER_EMU_INC) -I$(TILER_INC) $(CNN_LIB_INCLUDE) -I$(MODEL_BUILD) -I$(GAP_SDK_HOME)/libs/gap_lib/include
 SRCS      = main.c $(MODEL_GEN_C) $(MODEL_COMMON_SRCS) $(CNN_LIB)
 LFLAGS    =

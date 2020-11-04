@@ -58,7 +58,7 @@ static void Runkws()
   }
   printf("\n");
 
-  printf("Recognized: %d\n", rec_digit);
+  printf("Recognized:\t%d\n", rec_digit);
 }
 
 
