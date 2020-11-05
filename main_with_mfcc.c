@@ -36,10 +36,20 @@
 #include "LUT.def"
 #include "MFCC_FB.def"
 
-#define  WAV_BUFFER_SIZE           17000 // Something more than 1sec@16kHz
-#define  NNTOOL_INPUT_SCALE_FLOAT  1.9372712
-#define  NNTOOL_INPUT_SCALE        133
-#define  NNTOOL_INPUT_SCALEN       8
+#define  WAV_BUFFER_SIZE        17000 // Something more than 1sec@16kHz
+//DCT_NORMALIZATION        -> np.sqrt(1/(N_DCT))*0.5
+//NNTOOL_INPUT_SCALE_FLOAT -> 1.9372712
+// SCALE = NNTOOL_INPUT_SCALE_FLOAT*DCT_NORMALIZATION
+#ifdef LARGE
+    //with N_DCT=40
+    #define  INPUT_SCALE        157
+    #define  INPUT_SCALEN       10
+#else
+    //with N_DCT=10
+    #define  INPUT_SCALE        157
+    #define  INPUT_SCALEN       9
+#endif
+
 
 typedef signed char KWS_IMAGE_IN_T;
 L2_MEM short int *ResOut;
@@ -69,7 +79,7 @@ static void RunMFCC(){
         #ifdef PERF
             start = gap_cl_readhwtimer();
         #endif
-        MFCC_Kernel(inSig+i, mfcc_features+j, (i)?inSig[i-1]:0, TwiddlesLUT, SwapLUT, WindowLUT, MFCC_FilterBank,
+        MFCC00(inSig+i, mfcc_features+j, (i)?inSig[i-1]:0, TwiddlesLUT, SwapLUT, WindowLUT, MFCC_FilterBank,
                     MFCC_Coeffs, FRAME_SIZE, N_FFT, off_shift, NUMCEP, 5, N_DCT, DCT_Coeff, lift_coeff);
         #ifdef PERF
             elapsed = gap_cl_readhwtimer() - start;
@@ -77,7 +87,7 @@ static void RunMFCC(){
         #endif
     }
     #ifdef PERF
-      printf("MFCC Total Cycles: %d\n", total_cyc);
+      printf("MFCC Total Cycles: %d\n\n\n", total_cyc);
     #endif
 
     AT_L1_FREE(0, L1_Memory, _L1_Memory_SIZE);
@@ -150,19 +160,43 @@ void kws_ds_cnn(void)
         task_mfcc.stack_size = (unsigned int) STACK_SIZE;
         task_mfcc.slave_stack_size = SLAVE_STACK_SIZE;
         pi_cluster_send_task_to_cl(&cluster_dev, &task_mfcc);
+        pi_l2_free(inSig, WAV_BUFFER_SIZE * sizeof(short int));
     #else
         RunMFCC();
     #endif
 
-    pi_l2_free(inSig, WAV_BUFFER_SIZE * sizeof(short int));
     for (int i=0; i<N_FRAME; i++) {
         for (int j=0; j<N_DCT; j++) {
-            ImageIn[i*N_DCT+j] = (char) AT_SCALE(mfcc_features[i*N_DCT+j], NNTOOL_INPUT_SCALE, NNTOOL_INPUT_SCALEN);
+            ImageIn[i*N_DCT+j] = (char) AT_SCALE(mfcc_features[i*N_DCT+j], INPUT_SCALE, INPUT_SCALEN);
         }
     }
-    pi_l2_free(mfcc_features, N_FRAME * N_DCT * sizeof(short int));
 
-    printf("Constructor\n");
+    #ifdef PRINT_AT_INPUT
+    printf("input_prescale_gap = np.array([\n");
+    for (int i=0; i<N_FRAME; i++) {
+        printf("[");
+        for (int j=0; j<N_DCT; j++) {
+            printf("%d, ", mfcc_features[i*N_DCT+j]);
+        }
+        printf("],\n");
+    }
+    printf("])\n");
+    printf("input_gap = np.array([\n");
+    for (int i=0; i<N_FRAME; i++) {
+        printf("[");
+        for (int j=0; j<N_DCT; j++) {
+            printf("%d, ", ImageIn[i*N_DCT+j]);
+        }
+        printf("],\n");
+    }
+    printf("])\n");
+    #endif
+    #ifndef __EMUL__
+        pi_l2_free(mfcc_features, N_FRAME * N_DCT * sizeof(short int));
+    #endif
+
+
+    printf("\n\nConstructor\n");
     // IMPORTANT - MUST BE CALLED AFTER THE CLUSTER IS SWITCHED ON!!!!
     int err_construct = __PREFIX(CNN_Construct)();
     if (err_construct)
@@ -204,10 +238,10 @@ void kws_ds_cnn(void)
     #endif  /* PERF */
 
     __PREFIX(CNN_Destruct)();
-    pi_l2_free(ImageIn, AT_INPUT_WIDTH * AT_INPUT_HEIGHT * sizeof(KWS_IMAGE_IN_T));
-    pi_l2_free(ResOut,  12*sizeof(KWS_IMAGE_IN_T));
 
     #ifndef __EMUL__    
+        pi_l2_free(ImageIn, AT_INPUT_WIDTH * AT_INPUT_HEIGHT * sizeof(KWS_IMAGE_IN_T));
+        pi_l2_free(ResOut,  12*sizeof(KWS_IMAGE_IN_T));
         // Close the cluster
         pi_cluster_close(&cluster_dev);
     #endif

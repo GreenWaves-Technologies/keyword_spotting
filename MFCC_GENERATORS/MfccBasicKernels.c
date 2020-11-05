@@ -209,7 +209,7 @@ void MFCC_PowerV2S(MFCC_EP_T *Arg)
   First = CoreId*Chunk; Last = Min(First + Chunk, N);
 
   for (i=First; i<(unsigned int)Last; i++) {
-    int P = __DOTP2(((v2s*)FrameIn)[i], ((v2s*)FrameIn)[i]);
+    int P = gap_dotp2(((v2s*)FrameIn)[i], ((v2s*)FrameIn)[i]);
     Power_int[i] = P;
   }
 
@@ -359,7 +359,7 @@ void MFCC_ComputeMFCC_BFF(MFCC_MF_New_T *Arg)
 
     // compute shift right to apply on the block to prevent overflow
     short int shift  = 0 ;
-    short int shift0 = __FL1(maxin);
+    short int shift0 = gap_fl1(maxin);
 
     // check multiply overflow conditionQ18.14 * Q6.10 => Q8.24
     if ((shift0 + 10) > 31) shift = shift0 - 21; else shift = 0;
@@ -399,7 +399,7 @@ void MFCC_ComputeMFCC_BFF(MFCC_MF_New_T *Arg)
 
 int MFCC_Logfp(unsigned int a)
 {
-    int iLog2N  = __FL1(a);
+    int iLog2N  = gap_fl1(a);
     int valint = iLog2N - QNN;
 
     if (valint>=0) {
@@ -438,8 +438,8 @@ void MFCC_ComputeLog( MFCC_Log_T *Arg) {
   for (i=First;i<Last;i++){
     TMP = MFCC_Logfp(frameIn[i]);
     frameIn[i] =  TMP - LOG_NORM;
-    //frameIn[i] -= (2*shift + 2*offshift) * GAPLOG2;
-    frameIn[i] -= (2*shift + 2*offshift - shift_BF[i]) * GAPLOG2;
+    frameIn[i] -= (2*shift + 2*offshift) * GAPLOG2;
+    //frameIn[i] -= (2*shift + 2*offshift - shift_BF[i]) * GAPLOG2;
   }
   
   gap_waitbarrier(0);
@@ -550,7 +550,7 @@ void MFCC_ComputeDCT(DCT_Arg_T *Args) {
   First = CoreId*Chunk; Last = Min(First + Chunk, NDCT);
 
   for (i=First; i<Last; i++) {
-    in_dct[i] =  (v2s) __builtin_pulp_cplxmuls(in_dct[i],((v2s*) twiddct)[i]);
+    in_dct[i] =  (v2s) gap_cplxmuls(in_dct[i],((v2s*) twiddct)[i]);
     FeatList[i] = in_dct[i][0]; //take real part
   }
 

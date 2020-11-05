@@ -292,7 +292,9 @@ void GeneratorMFCC(char *Name, int FrameSize, int n_fft, int numcep, int mfcc_co
 
 }
 
-void MFCC_parallel(char *Name, int FrameSize, int n_fft, int numcep, int mfcc_coeff_cnt, int do_dct, int do_lifter, int n_dct)
+//#define HIGH_PREC_FFT
+
+void MFCC_parallel(char *Name, int FrameSize, int n_fft, int numcep, int mfcc_coeff_cnt, int do_dct, int do_lifter, int fft_radix_type, int n_dct)
 {
 
   int nbcalls = do_dct?9:8;

@@ -1846,7 +1846,7 @@ void Radix2FFT_DIF(FFT_Arg_T *Arg)
     signed short * __restrict__ Twiddles = Arg->Twiddles;
     unsigned int N_FFT2 = Arg->N_fft;
     //int iLog2N  = 31 - __builtin_clz(N_FFT2); //__FL1(N_FFT2);
-    int iLog2N  = __FL1(N_FFT2);
+    int iLog2N  = gap_fl1(N_FFT2);
     unsigned int iCnt1, iCnt2, iCnt3,
         iQ,    iL,    iM,
         iA,    iB;
@@ -1866,7 +1866,7 @@ void Radix2FFT_DIF(FFT_Arg_T *Arg)
                 iB = iA + iM;
                 Tmp = DataV[iA] - DataV[iB];
                 DataV[iA] = (DataV[iA] + DataV[iB]) >> (v2s) {FFT2_SCALEDOWN, FFT2_SCALEDOWN};
-                DataV[iB] = (v2s) __builtin_pulp_cplxmuls(Tmp, W) >> (v2s) {FFT2_SCALEDOWN, FFT2_SCALEDOWN};
+                DataV[iB] = (v2s) gap_cplxmuls(Tmp, W) >> (v2s) {FFT2_SCALEDOWN, FFT2_SCALEDOWN};
                 //DataV[iB] = __CPLX_MULS_DIV2(Tmp, W);
                 iA = iA + 2 * iM;
             }

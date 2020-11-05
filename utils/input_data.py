@@ -537,7 +537,7 @@ class AudioProcessor(object):
         sample_index = np.random.randint(len(candidates))
       sample = candidates[sample_index]
       if sample['label'] == SILENCE_LABEL:
-        wav_files.append('silence.wav')
+        wav_files.append('samples/silence.wav')
       else:
         wav_files.append(sample['file'])
       label_index = self.word_to_index[sample['label']]

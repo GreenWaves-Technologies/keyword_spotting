@@ -1,5 +1,11 @@
 # Models
 
+To test accuracy:
+
+    make test_accuracy_emul WITH_MFCC=[0,1] [SMALL-MEDIUM-LARGE]=1 (choose one)
+    make test_accuracy_tflite [SMALL-MEDIUM-LARGE]=1 (choose one)
+
+
 ## Small
 
 ### Training

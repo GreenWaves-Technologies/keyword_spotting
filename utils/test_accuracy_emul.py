@@ -79,7 +79,7 @@ def main(_):
     large = int("_l_" in FLAGS.tflite_model)
     if not small and not medium and not large:
       raise ValueError("You must select one of the models in model dir")
-    compile_command = 'make -f emul.mk clean_model clean all DUMP_TENSORS=0 SMALL={} MEDIUM={} LARGE={}'.format(small, medium, large)
+    compile_command = 'make -f emul.mk clean_model clean all DUMP_TENSORS=0 SMALL={} MEDIUM={} LARGE={} WITH_MFCC={}'.format(small, medium, large, 1 if FLAGS.test_with_wav == True else 0)
     print(compile_command)
     stream = os.popen(compile_command)
     for line in stream.readlines():
@@ -111,15 +111,20 @@ def main(_):
   total_conf_matrix = None
   corrects = 0
   for i in range(0, set_size):
-    validation_fingerprint, validation_ground_truth = audio_processor.get_data(1, i, model_settings, 0.0, 0, 0, 'validation', sess)
-    in_shape = [-1, FLAGS.dct_coefficient_count]
-    tf_mfccs_int8 = np.floor(validation_fingerprint.astype(np.float32) / FLAGS.nntool_input_scale + 0.5).astype(np.int8).reshape(in_shape) # Scale to int8
-    with open("test.pgm", 'wb') as f:
-      hdr =  'P5' + '\n' + str(tf_mfccs_int8.shape[1]) + '  ' + str(tf_mfccs_int8.shape[0]) + '  ' + str(255) + '\n'
-      f.write(hdr.encode())
-      np.int8(tf_mfccs_int8).tofile(f)
-
-    ex_stream = os.popen("./{} test.pgm".format(executable))
+    if not FLAGS.test_with_wav:
+      validation_fingerprint, validation_ground_truth = audio_processor.get_data(1, i, model_settings, 0.0, 0, 0, 'validation', sess)
+      # Quantize fingerprints and save it in a pgm file, then run the network with it
+      in_shape = [-1, FLAGS.dct_coefficient_count]
+      tf_mfccs_int8 = np.floor(validation_fingerprint.astype(np.float32) / FLAGS.nntool_input_scale + 0.5).astype(np.int8).reshape(in_shape) # Scale to int8
+      with open("test.pgm", 'wb') as f:
+        hdr =  'P5' + '\n' + str(tf_mfccs_int8.shape[1]) + '  ' + str(tf_mfccs_int8.shape[0]) + '  ' + str(255) + '\n'
+        f.write(hdr.encode())
+        np.int8(tf_mfccs_int8).tofile(f)
+      ex_stream = os.popen("./{} test.pgm".format(executable))
+    else:
+      # Run the exe on the wav file directly
+      validation_wav_file, validation_ground_truth = audio_processor.get_wav_files(1, i, model_settings, 'validation')
+      ex_stream = os.popen("./{} {}".format(executable, validation_wav_file[0]))
     emul_log = ex_stream.readlines()
     emul_prediction = None
     for line in emul_log:
@@ -127,6 +132,9 @@ def main(_):
       if m:
         emul_prediction = int(m['class'])
         break
+    if emul_prediction is None:
+      print("Error encountered with './{} {}'".format(executable, validation_wav_file[0]))
+      continue
 
     predicted_class = emul_prediction
     gt_class = np.argmax(validation_ground_truth)
@@ -137,8 +145,8 @@ def main(_):
     else:
       total_conf_matrix += conf_matrix
     if not(i % 100) and i > 0:
-      print("Pred/Tot: {}/{} Accuracy: {}%".format(corrects, i, corrects/i*100))
-  print("Pred/Tot: {}/{} Accuracy: {}%\n".format(corrects, i, corrects/i*100))
+      print("Pred/Tot:\t{:4d}/{:4d}\tAccuracy:\t{:.2f}%".format(corrects, i, corrects/i*100))
+  print("Pred/Tot:\t{:4d}/{:4d}\tAccuracy:\t{:.2f}%\n".format(corrects, i, corrects/i*100))
   print("Confusion matrix:\n{}".format(total_conf_matrix))
 
   # test set
@@ -148,14 +156,21 @@ def main(_):
   total_conf_matrix = None
   corrects = 0
   for i in range(0, set_size):
-    testing_fingerprint, testing_ground_truth = audio_processor.get_data(1, i, model_settings, 0.0, 0, 0, 'testing', sess)
-    tf_mfccs_int8 = np.floor(testing_fingerprint.astype(np.float32) / FLAGS.nntool_input_scale + 0.5).astype(np.int8).reshape(in_shape) # Scale to int8
-    with open("test.pgm", 'wb') as f:
-      hdr =  'P5' + '\n' + str(tf_mfccs_int8.shape[1]) + '  ' + str(tf_mfccs_int8.shape[0]) + '  ' + str(255) + '\n'
-      f.write(hdr.encode())
-      np.int8(tf_mfccs_int8).tofile(f)
+    if not FLAGS.test_with_wav:
+      testing_fingerprint, testing_ground_truth = audio_processor.get_data(1, i, model_settings, 0.0, 0, 0, 'testing', sess)
+      # Quantize fingerprints and save it in a pgm file, then run the network with it
+      in_shape = [-1, FLAGS.dct_coefficient_count]
+      tf_mfccs_int8 = np.floor(testing_fingerprint.astype(np.float32) / FLAGS.nntool_input_scale + 0.5).astype(np.int8).reshape(in_shape) # Scale to int8
+      with open("test.pgm", 'wb') as f:
+        hdr =  'P5' + '\n' + str(tf_mfccs_int8.shape[1]) + '  ' + str(tf_mfccs_int8.shape[0]) + '  ' + str(255) + '\n'
+        f.write(hdr.encode())
+        np.int8(tf_mfccs_int8).tofile(f)
+      ex_stream = os.popen("./{} test.pgm".format(executable))
+    else:
+      # Run the exe on the wav file directly
+      testing_wav_file, testing_ground_truth = audio_processor.get_wav_files(1, i, model_settings, 'testing')
+      ex_stream = os.popen("./{} {}".format(executable, testing_wav_file[0]))
 
-    ex_stream = os.popen("./{} test.pgm".format(executable))
     emul_log = ex_stream.readlines()
     emul_prediction = None
     for line in emul_log:
@@ -163,6 +178,10 @@ def main(_):
       if m:
         emul_prediction = int(m['class'])
         break
+    if emul_prediction is None:
+      print("Error encountered with './{} {}'".format(executable, testing_wav_file[0]))
+      continue
+
     predicted_class = emul_prediction
     gt_class = np.argmax(testing_ground_truth)
     corrects += 1 if predicted_class == gt_class else 0
@@ -172,8 +191,8 @@ def main(_):
     else:
       total_conf_matrix += conf_matrix
     if not(i % 100) and i > 0:
-      print("Pred/Tot: {}/{} Accuracy: {}%".format(corrects, i, corrects/i*100))
-  print("Pred/Tot: {}/{} Accuracy: {}%\n".format(corrects, i, corrects/i*100))
+      print("Pred/Tot:\t{:4d}/{:4d}\tAccuracy:\t{:.2f}%".format(corrects, i, corrects/i*100))
+  print("Pred/Tot:\t{:4d}/{:4d}\tAccuracy:\t{:.2f}%\n".format(corrects, i, corrects/i*100))
   print("Confusion matrix:\n{}".format(total_conf_matrix))
   os.popen("rm test.pgm")
 
@@ -273,6 +292,11 @@ if __name__ == '__main__':
       type=str,
       default=None,
       help='Path to compiled emul executable')
+  parser.add_argument(
+      '--test_with_wav',
+      type=int,
+      default=0,
+      help='Test with MFCC gap implementation')
 
   
   FLAGS, unparsed = parser.parse_known_args()

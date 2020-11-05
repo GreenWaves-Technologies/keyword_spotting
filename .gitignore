@@ -5,3 +5,5 @@ nntool_script
 samples/speech_dataset
 *__pycache__*
 kws_ds_cnn_emul
+*.ipynb_checkpoints
+test.pgm

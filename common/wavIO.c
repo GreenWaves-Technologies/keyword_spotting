@@ -42,7 +42,7 @@ static int ReadWAVHeader(char *FileName, header_struct *HeaderInfo)
 
 static int ReadWavShort(switch_file_t File, short int* OutBuf, unsigned int NumSamples, unsigned int Channels)
 {
-	char *data_buf = (char *) __ALLOC_L2(Channels*sizeof(short int));
+	unsigned char *data_buf = (unsigned char *) __ALLOC_L2(Channels*sizeof(short int));
 	int BytesPerSample = Channels * sizeof(short int);
 	if (data_buf==NULL) {
 		printf("Error allocating\n");
@@ -65,7 +65,7 @@ static int ReadWavShort(switch_file_t File, short int* OutBuf, unsigned int NumS
 
 static int ReadWavChar(switch_file_t File, char* OutBuf, unsigned int NumSamples, unsigned int Channels)
 {
-	return 0;
+	return 1;
 }
 
 int ReadWavFromFile(char *FileName, void* OutBuf, unsigned int BufSize, header_struct *HeaderInfo) 

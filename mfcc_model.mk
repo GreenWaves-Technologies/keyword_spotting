@@ -20,12 +20,30 @@ ifdef MODEL_L3_MEMORY
   MODEL_GEN_EXTRA_FLAGS += --L3 $(MODEL_L3_MEMORY)
 endif
 
+SMALL  ?= 0
+MEDIUM ?= 0
+LARGE  ?= 0
+ifeq ($(SMALL), 1)
+SIZE_DEF += -DSMALL
+else
+ifeq ($(MEDIUM), 1)
+SIZE_DEF += -DMEDIUM
+else
+ifeq ($(LARGE), 1)
+SIZE_DEF += -DLARGE
+else
+$(error You must set to 1 one of SMALL, MEDIUM, LARGE to select a network)
+endif
+endif
+endif
+
 $(MFCCBUILD_DIR):
 	mkdir $(MFCCBUILD_DIR)
 
 # Build the code generator from the model code
 $(MFCC_MODEL_GEN): $(MFCCBUILD_DIR)
-	gcc -g -o $(MFCC_MODEL_GEN) -I$(MFCC_DIR) -I$(LUT_GEN_DIR) -I$(TILER_INC) -I$(TILER_EMU_INC) $(MFCC_DIR)/MFCCmodel.c $(MFCC_SRCG) $(TILER_LIB)  $(TABLE_CFLAGS) #$(SDL_FLAGS)
+	gcc -g -o $(MFCC_MODEL_GEN) -I$(MFCC_DIR) -I$(LUT_GEN_DIR) -I$(TILER_INC) -I$(TILER_EMU_INC) $(SIZE_DEF) \
+			  $(MFCC_DIR)/MFCCmodel.c $(MFCC_SRCG) $(TILER_LIB)  $(TABLE_CFLAGS) #$(SDL_FLAGS)
 
 # Run the code generator  kernel code
 mfcc_model: $(MFCC_MODEL_GEN) 
