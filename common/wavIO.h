@@ -30,5 +30,6 @@ typedef struct {
 } header_struct;
 
 int ReadWavFromFile(char *FileName, void* OutBuf, unsigned int BufSize, header_struct *HeaderInfo);
+int WriteWavToFile(char *FileName, int BytesPerSample, int SampleRate, int NumChannels, void *data, int Size);
 
 #endif //__WAV_IO_H__

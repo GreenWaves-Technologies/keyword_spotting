@@ -8,7 +8,7 @@
  */
 #include "wavIO.h"
 
-#define WAV_HEADER_LEN	44
+#define WAV_HEADER_SIZE	44
 
 static int ReadWAVHeader(char *FileName, header_struct *HeaderInfo)
 {
@@ -23,9 +23,9 @@ static int ReadWAVHeader(char *FileName, header_struct *HeaderInfo)
 	}
 
 	unsigned int Err = 0;
-	unsigned char *Header = (unsigned char *) __ALLOC_L2(WAV_HEADER_LEN);
+	unsigned char *Header = (unsigned char *) __ALLOC_L2(WAV_HEADER_SIZE);
 	Err |= (Header == 0);
-	if ((__READ(File, Header, WAV_HEADER_LEN) != WAV_HEADER_LEN) || Err) return 1;
+	if ((__READ(File, Header, WAV_HEADER_SIZE) != WAV_HEADER_SIZE) || Err) return 1;
 
 	HeaderInfo->FileSize      = Header[4]  | (Header[5]<<8)  | (Header[6]<<16)  |	(Header[7]<<24);
 	HeaderInfo->format_type   = Header[20] | (Header[21]<<8);
@@ -34,7 +34,7 @@ static int ReadWAVHeader(char *FileName, header_struct *HeaderInfo)
 	HeaderInfo->byterate      = Header[32] | (Header[33]<<8);
 	HeaderInfo->BitsPerSample = Header[34] | (Header[35]<<8);
 	HeaderInfo->DataSize      = Header[40] | (Header[41]<<8) | (Header[42]<<16) |	(Header[43]<<24);
-	__FREE_L2(Header, WAV_HEADER_LEN);
+	__FREE_L2(Header, WAV_HEADER_SIZE);
 	__CLOSE(File);
 	__FS_DEINIT(fs);
 	return Err;
@@ -65,12 +65,16 @@ static int ReadWavShort(switch_file_t File, short int* OutBuf, unsigned int NumS
 
 static int ReadWavChar(switch_file_t File, char* OutBuf, unsigned int NumSamples, unsigned int Channels)
 {
+	printf("Not supported yet\n");
 	return 1;
 }
 
 int ReadWavFromFile(char *FileName, void* OutBuf, unsigned int BufSize, header_struct *HeaderInfo) 
 {
-	if (ReadWAVHeader(FileName, HeaderInfo)) return 1;
+	if (ReadWAVHeader(FileName, HeaderInfo)) {
+		printf("Error reading header\n");
+		return 1;
+	}
 	switch_file_t File = (switch_file_t) 0;
 	switch_fs_t fs;
 	__FS_INIT(fs);
@@ -82,7 +86,7 @@ int ReadWavFromFile(char *FileName, void* OutBuf, unsigned int BufSize, header_s
 	int NumSamples = HeaderInfo->DataSize * 8 / (HeaderInfo->NumChannels * HeaderInfo->BitsPerSample);
 	int SizeOfEachSample = (HeaderInfo->NumChannels * HeaderInfo->BitsPerSample) / 8;
 
-	__SEEK(File, WAV_HEADER_LEN);
+	__SEEK(File, WAV_HEADER_SIZE);
 
 	int SamplesShort;
 	if (HeaderInfo->BitsPerSample == 16) SamplesShort = 1;
@@ -116,4 +120,110 @@ Fail:
 	printf("Failed to load file %s from flash\n", FileName);
 	return 1;
 
+}
+
+int WriteWavToFile(char *FileName, int BytesPerSample, int SampleRate, int NumChannels, void *data, int Size)
+{
+	switch_fs_t fs;
+	__FS_INIT(fs);
+
+    void *File = __OPEN_WRITE(fs, FileName);
+
+    unsigned int idx = 0;
+    unsigned int sz = WAV_HEADER_SIZE + Size;
+
+    unsigned char *header_buffer = (unsigned char *) __ALLOC_L2(WAV_HEADER_SIZE * sizeof(char));
+
+    // 4 bytes "RIFF"
+    header_buffer[idx++] = 'R';
+    header_buffer[idx++] = 'I';
+    header_buffer[idx++] = 'F';
+    header_buffer[idx++] = 'F';
+
+    // 4 bytes File size - 8bytes 32kS 0x10024 - 65408S 0x1ff24
+    //header_buffer[idx++] = 0x24;
+    //header_buffer[idx++] = 0xff;
+    //header_buffer[idx++] = 0x01;
+    //header_buffer[idx++] = 0x00;
+    header_buffer[idx++] = (unsigned char) (sz & 0x000000ff);
+    header_buffer[idx++] = (unsigned char)((sz & 0x0000ff00) >> 8);
+    header_buffer[idx++] = (unsigned char)((sz & 0x00ff0000) >> 16);
+    header_buffer[idx++] = (unsigned char)((sz & 0xff000000) >> 24);
+
+    // 4 bytes file type: "WAVE"
+    header_buffer[idx++] = 'W';
+    header_buffer[idx++] = 'A';
+    header_buffer[idx++] = 'V';
+    header_buffer[idx++] = 'E';
+
+    // 4 bytes format chunk: "fmt " last char is trailing NULL
+    header_buffer[idx++] = 'f';
+    header_buffer[idx++] = 'm';
+    header_buffer[idx++] = 't';
+    header_buffer[idx++] = ' ';
+
+    // 4 bytes length of format data below, until data part
+    header_buffer[idx++] = 0x10;
+    header_buffer[idx++] = 0x00;
+    header_buffer[idx++] = 0x00;
+    header_buffer[idx++] = 0x00;
+
+    // 2 bytes type of format: 1 (PCM)
+    header_buffer[idx++] = 0x01;
+    header_buffer[idx++] = 0x00;
+
+    // 2 bytes nb of channels: 1 or 2
+    //header_buffer[idx++] = 0x02;
+    //header_buffer[idx++] = 0x01;
+    header_buffer[idx++] = NumChannels;
+    header_buffer[idx++] = 0x00;
+
+    // 4 bytes sample rate in Hz:
+    header_buffer[idx++] = (SampleRate >> 0) & 0xff;
+    header_buffer[idx++] = (SampleRate >> 8) & 0xff;
+    header_buffer[idx++] = (SampleRate >> 16) & 0xff;
+    header_buffer[idx++] = (SampleRate >> 24) & 0xff;
+
+    // 4 bytes (Sample Rate * BitsPerSample * Channels) / 8:
+    // (8000*16*1)/8=0x3e80 * 2
+    // (16000*16*1)/8=32000 or 0x6F00
+    // (22050*16*1)/8=0xac44
+    // (22050*16*2)/8=0x15888
+    int rate = (SampleRate * BytesPerSample * NumChannels) / 8;
+    header_buffer[idx++] = (rate >> 0) & 0xff;
+    header_buffer[idx++] = (rate >> 8) & 0xff;
+    header_buffer[idx++] = (rate >> 16) & 0xff;
+    header_buffer[idx++] = (rate >> 24) & 0xff;
+
+    // 2 bytes (BitsPerSample * Channels) / 8:
+    // 16*1/8=2 - 16b mono
+    // 16*2/8=4 - 16b stereo
+    rate = (BytesPerSample * NumChannels) / 8;
+    header_buffer[idx++] = (rate >> 0) & 0xff;
+    header_buffer[idx++] = (rate >> 8) & 0xff;
+
+    // 2 bytes bit per sample:
+    header_buffer[idx++] = BytesPerSample;
+    header_buffer[idx++] = 0x00;
+
+    // 4 bytes "data" chunk
+    header_buffer[idx++] = 'd';
+    header_buffer[idx++] = 'a';
+    header_buffer[idx++] = 't';
+    header_buffer[idx++] = 'a';
+
+    // 4 bytes size of data section in bytes:
+    header_buffer[idx++] = (unsigned char) (Size & 0x000000ff);
+    header_buffer[idx++] = (unsigned char)((Size & 0x0000ff00) >> 8);
+    header_buffer[idx++] = (unsigned char)((Size & 0x00ff0000) >> 16);
+    header_buffer[idx++] = (unsigned char)((Size & 0xff000000) >> 24);
+
+    int ret = 0;
+    ret += __WRITE(File, header_buffer, WAV_HEADER_SIZE);
+    ret += __WRITE(File, data, Size);
+
+    __CLOSE(File);
+
+    __FS_DEINIT(fs);
+    return ret;
 }
