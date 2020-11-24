@@ -1,6 +1,9 @@
 #include "Gap.h"
 #include "MfccBasicKernels.h"
 #include "FFTLib.h"
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
 
 #define abs(a)  (((a)<0) ? (-(a)) : (a))
 #define FFT4_SCALEDOWN 2
@@ -10,15 +13,18 @@
 //#define GAPLOG2   ((int) floor(log(2)*(float)(1<<QN)+0.5))
 //#define c1_3      ((int) floor((1.0/3.0) * (float)(1<<QN) +0.5))
 //#define LOG_NORM  ((int) floor(log((float)(1<<(QN-QN_LOC))+0.5))
-#define QNN        16
-#define QN_LOC     23
-#define GAPLOG2    (0xb172)
-#define c1_3       (0x5555)
-#define LOG_NORM    (0x58b91)
+#define QNN    16
+#define QN_LOC     34
+#define GAPLOG2   (0xb172)
+#define c1_3    (0x5555)
+#define LOG_NORM    (0xc7a06)
+
+#define FFT_BITS 10
 
 // DCT
 //#define NORMDCT  ((short int) floor(1.0/sqrt(2)*(1<<15)))
 #define NORMDCT    (0x5a82)
+#define NDCT_BITS  gap_fl1(NDCT)
 
 
 #define Min(x, y)       (((x)<(y))?(x):(y))
@@ -92,7 +98,7 @@ void MFCC_PreEmphasis(MFCC_PreEmphasis_T *Arg)
   int shift = *(Arg->Shift);
   S = CoreId? Frame[First-1]<<shift : Arg->Prev<<shift;
 
-  short int Fix097 = FP2FIX(0.97, 15); //TODO 0.97 must become a parameter
+  short int Fix097 = FP2FIX(0, 15); //TODO 0.97 must become a parameter
   for (int i=First; i<Last; i++) {
     Sprev = Frame[i]<<shift;
     Out[i] = Sprev - gap_mulsRN(Fix097, S, 15);
@@ -105,8 +111,8 @@ void MFCC_PreEmphasis(MFCC_PreEmphasis_T *Arg)
 
 #ifdef PRINTDEB
   if (CoreId==0) {
-    printf("\n\n***************** PreEmphasis *****************\n\n");
-    printf("Shift %d\n",*Arg->Shift);
+    printf("\n\n#############*** PreEmphasis #############***\n\n");
+    printf("Shift = %d\n",*Arg->Shift);
     printf("out_preemph_c = np.array([\n\t\t");
     for(int i=0; i<FrameSize ; i++) {
       printf("%d, ", Out[i]);
@@ -142,8 +148,8 @@ void MFCC_WindowedFrame(MFCC_WF_T *Arg)
 
 #ifdef PRINTDEB
   if (CoreId==0) {
-    printf("\n\n***************** Windowing *****************\n\n");
-    printf("FFT dim %d\n",FFT_Dim);
+    printf("\n\n#############*** Windowing #############***\n\n");
+    printf("N_FFT = %d\n",FFT_Dim);
     //for(int i=0; i<FFT_Dim ; i++) printf("idx: %3d\tInput: %d\tWindow: %d\tOutput: %d\n", i, Arg->Frame[i], Window[i], Arg->OutFrame[i]);
     printf("out_window_c = np.array([\n\t\t");
     for(int i=0; i<FFT_Dim ; i++) {
@@ -184,7 +190,7 @@ void MFCC_WindowedFrame_int(MFCC_WFINT_T *Arg)
 
   #ifdef PRINTDEB
     if (CoreId==0) {
-      printf("\n\n************** Window **************\n");
+      printf("\n\n############# Window #############\n");
       printf("FFT dim %d\n",FFT_Dim);
       printf("\n\nWindowed = np.array([\n\t");
       for(int i=0; i<FFT_Dim ; i++) {
@@ -242,7 +248,6 @@ void MFCC_Power(MFCC_EP_T *Arg)
   for (i=First; i<(unsigned int)Last; i++) {
     int P = (FrameIn[2*i]>>16) * (FrameIn[2*i]>>16) + (FrameIn[2*i+1]>>16) * (FrameIn[2*i+1]>>16);
     Power_int[i] = P; // __MULSRN(P, INVSQRT2, FFT2_SAMPLE_DYN);
-    //shift_fft[i] -= 16;
   }
   gap_waitbarrier(0);
 
@@ -258,6 +263,67 @@ void MFCC_Power(MFCC_EP_T *Arg)
         printf("%d, ", shift_fft[i]);
       }
       printf("\n])\n\n\n");
+    }
+  #endif
+}
+
+void MFCC_Abs(MFCC_EP_T *Arg)
+{
+  int *__restrict__ FrameIn     = (int *) Arg->FrameIn;
+  int *__restrict__ Spectrogram = (int *) Arg->FrameOut;
+  signed char *     shift_fft = (signed char *) Arg->shift_fft;
+  int N = (Arg->nfft)/2 + 1;
+  unsigned int i;
+
+  unsigned int Chunk, First, Last, CoreId=gap_coreid();
+  Chunk = ChunkSize(N);
+  First = CoreId*Chunk; Last = Min(First + Chunk, N);
+
+  for (i=First; i<(unsigned int)Last; i++) {
+    int S = ((int) round(sqrt(gap_dotp2(((v2s*)FrameIn)[i], ((v2s*)FrameIn)[i]))));
+    Spectrogram[i] = S;
+  }
+
+  gap_waitbarrier(0);
+
+  #ifdef PRINTDEB
+    if (CoreId==0) {
+      printf("\n\nout_spectrogram = np.array([\n\t");
+      for (i=0; i<N; i++){
+        printf("%d, ", Spectrogram[i]);
+      }
+      printf("\n])");
+    }
+  #endif
+}
+
+
+void MFCC_Abs_BFF(MFCC_EP_T *Arg)
+{
+  int *__restrict__ FrameIn     = (int *) Arg->FrameIn;
+  int *__restrict__ Spectrogram = (int *) Arg->FrameOut;
+  signed char *     shift_fft = (signed char *) Arg->shift_fft;
+  int N = (Arg->nfft)/2 + 1;
+  unsigned int i;
+
+  unsigned int Chunk, First, Last, CoreId=gap_coreid();
+  Chunk = ChunkSize(N);
+  First = CoreId*Chunk; Last = Min(First + Chunk, N);
+
+  for (i=First; i<(unsigned int)Last; i++) {
+    int S = ( (int) round(sqrt(( double) ((FrameIn[2*i]>>16) * (FrameIn[2*i]>>16) + (FrameIn[2*i+1]>>16) * (FrameIn[2*i+1]>>16)))) ) << (shift_fft[i]);
+    Spectrogram[i] = S;
+  }
+
+  gap_waitbarrier(0);
+
+  #ifdef PRINTDEB
+    if (CoreId==0) {
+      printf("\n\nout_spectrogram = np.array([\n\t");
+      for (i=0; i<N; i++){
+        printf("%d, ", Spectrogram[i]);
+      }
+      printf("\n])");
     }
   #endif
 }
@@ -298,9 +364,6 @@ void MFCC_ComputeMFCC(MFCC_MF_T *Arg)
     // check multiply overflow condition FramePower * Q6.10 <= Q31
     #define MEL_COEFF_DYN 10
     if ((shift0+MEL_COEFF_DYN)>31) shift = shift0-(31-MEL_COEFF_DYN); else shift = 0;
-    #ifdef PRINTDEB
-      printf("shift mel: %d\n", shift);
-    #endif
 
     for (k=0, j=MFCC_FilterBank[i].Start; j<(unsigned int)(MFCC_FilterBank[i].Start+Count); j++, k++){
       Coeff = Coeff + MFCC_Coeffs[Base+k]*(FramePower[j]>>shift);
@@ -338,11 +401,12 @@ void MFCC_ComputeMFCC_BFF(MFCC_MF_New_T *Arg)
   Chunk = ChunkSize(mfcc_bank_cnt);
   First = CoreId*Chunk; Last = Min(First + Chunk, mfcc_bank_cnt);
   
-  int min_shift;         
+  int min_shift;    
+  short int shift;     
   for (i=First; i<Last; i++) {
     unsigned int Coeff = 0;
     int Base = MFCC_FilterBank[i].Base;
-    int Count = (MFCC_FilterBank[i].Stop-MFCC_FilterBank[i].Start);
+    int Count = (MFCC_FilterBank[i].Stop-MFCC_FilterBank[i].Start+1);
     int maxin=0;
     min_shift = 0x7fff;
 
@@ -352,31 +416,28 @@ void MFCC_ComputeMFCC_BFF(MFCC_MF_New_T *Arg)
 
     // align the block scaling on the min , compute the max value in the block
     for (k=0, j=MFCC_FilterBank[i].Start; j<(unsigned int)(MFCC_FilterBank[i].Start+Count); j++, k++) {
-      //int TMP = FramePower[j] >> ( 2 * (shift_pow[j] - min_shift));
-      int TMP = FramePower[j];
+      int TMP = FramePower[j] >> ( 2 * (shift_pow[j] - min_shift));
       if (TMP > (unsigned int) maxin) maxin = TMP;
     }
 
     // compute shift right to apply on the block to prevent overflow
-    short int shift  = 0 ;
+    shift  = 0 ;
     short int shift0 = gap_fl1(maxin);
 
     // check multiply overflow conditionQ18.14 * Q6.10 => Q8.24
-    if ((shift0 + 10) > 31) shift = shift0 - 21; else shift = 0;
+    if ((shift0 + 14) > 31) shift = shift0 - 17; else shift = 0;
 
     for (k=0, j=MFCC_FilterBank[i].Start; j<(unsigned int)(MFCC_FilterBank[i].Start+Count); j++, k++) {
-      //Coeff = Coeff + MFCC_Coeffs[Base+k]*(FramePower[j]>>(shift + 2 * (shift_pow[j] - min_shift)));
-      Coeff = Coeff + MFCC_Coeffs[Base+k]*(FramePower[j]>>(shift));
+      Coeff = Coeff + MFCC_Coeffs[Base+k]*(FramePower[j]>>(shift + 2 * (shift_pow[j] - min_shift)));
+      //Coeff = Coeff + MFCC_Coeffs[Base+k]*(FramePower[j]>>(shift));
     }
     // update the shift left  value on the block (to compensate)
-    //shift_BF[i] = shift - 2 * min_shift;
-    shift_BF[i] = shift;
+    shift_BF[i] = shift - 2 * min_shift;
     MFCC[i] = Coeff;
   }
   gap_waitbarrier(0);
   #ifdef PRINTDEB
     if (CoreId==0) {
-      printf("min_shift %d\n", min_shift);
       printf("\nout_melfilterbank = np.array([\n\t");
       for (i=0; i<mfcc_bank_cnt; i++){
         printf("%u, ", MFCC[i]);
@@ -425,7 +486,7 @@ void MFCC_ComputeLog( MFCC_Log_T *Arg) {
   int i;
   int         size      = Arg->FrameSize;
   int         *frameIn  = (int *) Arg->FrameIn;
-  int         shift     = *Arg->Shift;
+  int         Shift     = *Arg->Shift;
   int         offshift  = Arg->offshift;
   signed char *shift_BF = Arg->shift_BF;
 
@@ -437,9 +498,16 @@ void MFCC_ComputeLog( MFCC_Log_T *Arg) {
 
   for (i=First;i<Last;i++){
     TMP = MFCC_Logfp(frameIn[i]);
-    frameIn[i] =  TMP - LOG_NORM;
-    frameIn[i] -= (2*shift + 2*offshift) * GAPLOG2;
-    //frameIn[i] -= (2*shift + 2*offshift - shift_BF[i]) * GAPLOG2;
+
+    #ifndef USE_ABS
+    #ifdef HIGH_PREC_FFT
+      frameIn[i] =  TMP - (8 - shift_BF[i] - QNN + 2*Shift) * GAPLOG2;
+    #else
+      frameIn[i] =  TMP - (2*(16-FFT_BITS+Shift)+10 - QNN) * GAPLOG2;
+    #endif
+    #else
+      frameIn[i] =  TMP - ((16-FFT_BITS+Shift)+10 - QNN) * GAPLOG2;
+    #endif
   }
   
   gap_waitbarrier(0);
@@ -447,8 +515,10 @@ void MFCC_ComputeLog( MFCC_Log_T *Arg) {
 #ifdef PRINTDEB
   if (CoreId==0) {
     printf("LOG\n");
-    printf("Shift = %d\n", shift);
+    printf("Shift = %d\n", Shift);
     printf("offshift = %d\n", offshift);
+    printf("GAPLOG2 = %d\n", GAPLOG2);
+    printf("LOG_NORM = %d\n", LOG_NORM);
     printf("out_log = np.array([\n");
     for(i=0;i<size;i++) printf("%d, ", frameIn[i]);
     printf("])\n");
@@ -607,9 +677,10 @@ void MFCC_ComputeDCT_II(DCT_II_Arg_T *Args)
   for (k=First; k<Last; k++) {
     TMP = 0;
     for (i=0; i<NDCT; i++){
-      TMP += gap_mulsRN(in_dct[i], DCTCoeff[i+k*NDCT], 15);
+      TMP += (in_dct[i] * DCTCoeff[i+k*NDCT]) >> (QNN+5);
     }
-    FeatList[k] = (short int) gap_clip(AT_NORM(TMP, 10), 15);;
+    //FeatList[k] = (short int) gap_clip(AT_NORM(TMP, 10), 15);;
+    FeatList[k] = (short int) gap_clip(TMP, 15);;
   }
   gap_waitbarrier(0);
 

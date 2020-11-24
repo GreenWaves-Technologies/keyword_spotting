@@ -120,6 +120,7 @@ void RadixMixedFFT1D_FP16_Args(FFT_Arg_T *Arg);
 void Radix2FFT_DIF_Par_FP16(FFT_Arg_T *Arg);
 void RadixMixedFFT_DIF_Inv_Par(FFT_Arg_T *Arg);
 void Radix2FFT_DIF_Inv_Par(FFT_Arg_T *Arg);
+void Radix2FFT_DIF(FFT_Arg_T *Arg);
 
 void Radix4FFT1D_FP_Args(FFT_Arg_T *Arg);
 void Radix2FFT1D_FP_Args(FFT_Arg_T *Arg);

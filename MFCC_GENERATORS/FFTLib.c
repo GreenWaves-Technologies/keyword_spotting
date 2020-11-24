@@ -17,6 +17,7 @@
 #include "FP_Lib.h"
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 
 
@@ -681,7 +682,7 @@ void SwapSamples_scal( SwapSamples_scal_Arg_T *Arg)
 
   #ifdef PRINTDEB
     if (CoreId==0) {
-      printf("\n\n************** SWAP FFT **************\n");
+      printf("\n\n############# SWAP FFT #############\n");
       printf("\n\nout_fft_swapped_c = np.array([ \n\t");
       for (int j=0; j<Ni; j++) {
         if (Datav[j][1]<0) printf("%d%dj, ",  Datav[j][0], Datav[j][1]);
@@ -725,7 +726,7 @@ void SwapSamples_Par(SwapSamples_Arg_T *Arg)
 
     #ifdef PRINTDEB
       if (CoreId==0){
-        printf("\n\n************* Swapped ***********\n\n");
+        printf("\n\n############# Swapped #############n\n");
         printf("out_swapped_fft = np.array([\n\t");
         for (int j=0; j<Ni; j++) {
 	      //if (!(j%2)) printf("\n%d ",j);
@@ -1361,20 +1362,6 @@ static void RadixMixedFFT_DIF_Par_Ker(FFT_Arg_T *Arg)
   }
   gap_waitbarrier(0);
 #endif
-      
-#ifdef PRINTDEB
-	if (CoreId==0) {
-    printf("************ FFT *************\n");
-	  printf("out_fft_c = np.array([ \n\t");
-	  for (int j=0; j<N_fft; j++) {
-      if (DataV[j][1]<0) printf("%d%dj, ",  DataV[j][0], DataV[j][1]);
-      else               printf("%d+%dj, ", DataV[j][0], DataV[j][1]);
-	  }
-    printf("\n])\n");
-	}
-	gap_waitbarrier(0);
-#endif
-
 }
 
 
@@ -1517,19 +1504,6 @@ static void Radix2FFT_DIF_Par_Ker(FFT_Arg_T *Arg)
     iA = iA + 2;
   }
   gap_waitbarrier(0);
-
-
-  #ifdef PRINTDEB
-    if (CoreId==0) {
-      printf("out_fft_c = np.array([ \n\t");
-      for (int j=0; j<N_FFT2; j++) {
-        if (DataV[j][1]<0) printf("%d%dj, ",  DataV[j][0], DataV[j][1]);
-        else               printf("%d+%dj, ", DataV[j][0], DataV[j][1]);
-      }
-      printf("\n])\n");
-    }
-    gap_waitbarrier(0);
-  #endif
 
   #ifdef DBGFFT
     if (CoreId==0) {
@@ -1823,18 +1797,6 @@ void Radix2FFT_DIF_INT_Scal_Par(FFT_scal_Arg_T *Arg)
     }
     gap_waitbarrier(0);
 
-  // #ifdef PRINTDEB
-  //   if (CoreId==0) {
-  //     printf("\n\n************** FFT **************\n");
-  //     printf("\n\nout_fft_c = np.array([ \n\t");
-  //     for (int j=0; j<N_FFT2; j++) {
-  //       if (DataV[j][1]<0) printf("%d%dj, ",  DataV[j][0], DataV[j][1]);
-  //       else               printf("%d+%dj, ", DataV[j][0], DataV[j][1]);
-  //     }
-  //     printf("\n])\n");
-  //   }
-  //   gap_waitbarrier(0);
-  // #endif
 }
 //
 // version of FFT where scaling is done at each add/sub in the butterfly

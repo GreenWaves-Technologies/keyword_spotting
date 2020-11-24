@@ -2,6 +2,7 @@
 #include "FFTLib.h"
 
 #define AT_NORM(x, n)	gap_norm_reg((x), (n))
+//#define HIGH_PREC_FFT
 
 typedef struct mfcc_params {
   short int in_freq;
@@ -31,6 +32,12 @@ typedef struct {
   signed char *__restrict__ shift_fft;
   int nfft;
 } MFCC_EP_T;
+
+typedef struct {
+  v2s *__restrict__ FrameIn;
+  int *__restrict__ FrameOut;
+  int nfft;
+} MFCC_Abs_T;
 
 typedef struct {
   short int * __restrict__ Frame;
@@ -134,6 +141,8 @@ void MFCC_WindowedFrame(MFCC_WF_T *Arg);
 void MFCC_WindowedFrame_int(MFCC_WFINT_T *Arg);
 void MFCC_PowerV2S(MFCC_EP_T *Arg);
 void MFCC_Power(MFCC_EP_T *Arg);
+void MFCC_Abs_BFF(MFCC_EP_T *Arg);
+void MFCC_Abs(MFCC_EP_T *Arg);
 void MFCC_ComputeMFCC(MFCC_MF_T *Arg);
 void MFCC_ComputeMFCC_BFF(MFCC_MF_New_T *Arg);
 void MFCC_ComputeDCT(DCT_Arg_T *Args) ;
