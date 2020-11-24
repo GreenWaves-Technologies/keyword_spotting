@@ -11,3 +11,4 @@ set graph_monitor_cycles true
 set graph_const_exec_from_flash false
 GRAPH_DUMP
 gen MODEL_SRC -T TENSORS_DIR -M MODEL_BUILD -t
+save_state

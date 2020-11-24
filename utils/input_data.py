@@ -45,6 +45,7 @@ UNKNOWN_WORD_INDEX = 1
 BACKGROUND_NOISE_DIR_NAME = '_background_noise_'
 RANDOM_SEED = 59185
 
+USE_POWER = True
 
 def prepare_words_list(wanted_words):
   """Prepends common tokens to the custom word list.
@@ -405,15 +406,37 @@ class AudioProcessor(object):
     background_add = tf.add(background_mul, sliced_foreground)
     background_clamp = tf.clip_by_value(background_add, -1.0, 1.0)
     # Run the spectrogram and MFCC ops to get a 2D 'fingerprint' of the audio.
-    spectrogram = contrib_audio.audio_spectrogram(
+    spectrograms_power = contrib_audio.audio_spectrogram(
         background_clamp,
         window_size=model_settings['window_size_samples'],
         stride=model_settings['window_stride_samples'],
         magnitude_squared=True)
-    self.mfcc_ = contrib_audio.mfcc(
-        spectrogram,
-        wav_decoder.sample_rate,
-        dct_coefficient_count=model_settings['dct_coefficient_count'])
+
+    if USE_POWER:
+      # Warp the linear scale spectrograms into the mel-scale.
+      num_spectrogram_bins = spectrograms_power.shape[-1].value
+      lower_edge_hertz, upper_edge_hertz, num_mel_bins = 20.0, 4000.0, 40
+      linear_to_mel_weight_matrix = tf.signal.linear_to_mel_weight_matrix(
+        num_mel_bins, num_spectrogram_bins, 16000.0, lower_edge_hertz,
+        upper_edge_hertz)
+      mel_spectrograms = tf.tensordot(
+        spectrograms_power, linear_to_mel_weight_matrix, 1)
+      mel_spectrograms.set_shape(spectrograms_power.shape[:-1].concatenate(
+        linear_to_mel_weight_matrix.shape[-1:]))
+
+      # Compute a stabilized log to get log-magnitude mel-scale spectrograms.
+      log_mel_spectrograms = tf.math.log(mel_spectrograms + 1e-6)
+
+      # Compute MFCCs from log_mel_spectrograms and take the first NDCT.
+      mfccs = tf.signal.mfccs_from_log_mel_spectrograms(
+        log_mel_spectrograms)[..., :model_settings['dct_coefficient_count']]
+      self.mfcc_ = tf.expand_dims(mfccs, axis=0)
+
+    else:
+      self.mfcc_ = contrib_audio.mfcc(
+         spectrograms_power,
+         wav_decoder.sample_rate,
+         dct_coefficient_count=model_settings['dct_coefficient_count'])
 
   def set_size(self, mode):
     """Calculates the number of samples in the dataset partition.
@@ -590,3 +613,26 @@ class AudioProcessor(object):
         label_index = self.word_to_index[sample['label']]
         labels.append(words_list[label_index])
     return data, labels
+
+  def get_unprocessed_data_from_file(self, filepath, model_settings):
+    """Retrieve sample data for the given partition, with no transformations.
+   """
+    desired_samples = model_settings['desired_samples']
+    words_list = self.words_list
+    # get only one file
+    data = np.zeros((1, desired_samples))
+    labels = []
+    with tf.Session(graph=tf.Graph()) as sess:
+      wav_filename_placeholder = tf.placeholder(tf.string, [])
+      wav_loader = io_ops.read_file(wav_filename_placeholder)
+      wav_decoder = contrib_audio.decode_wav(
+          wav_loader, desired_channels=1, desired_samples=desired_samples)
+      foreground_volume_placeholder = tf.placeholder(tf.float32, [])
+      scaled_foreground = tf.multiply(wav_decoder.audio,
+                                      foreground_volume_placeholder)
+
+      input_dict = {wav_filename_placeholder: filepath,
+                    foreground_volume_placeholder: 1}
+      data[0, :] = sess.run(scaled_foreground, feed_dict=input_dict).flatten()
+    return data
+

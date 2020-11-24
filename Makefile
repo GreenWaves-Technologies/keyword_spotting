@@ -23,6 +23,7 @@ ifeq ($(SMALL), 1)
 else
 	ifeq ($(MEDIUM), 1)
 		MODEL_PREFIX = KWS_ds_cnn_m_quant
+		TRAINED_TFLITE_MODEL=model/$(MODEL_PREFIX)_new.tflite
 		DCT_COUNT = 10
 		FRAME_SIZE_ms = 40
 		FRAME_STEP_ms = 20
@@ -81,9 +82,10 @@ endif
 APP_CFLAGS += -O3 -s -mno-memcpy -fno-tree-loop-distribute-patterns 
 APP_CFLAGS += -I. -I$(MODEL_COMMON_INC) -I$(TILER_EMU_INC) -I$(TILER_INC) -I$(MODEL_BUILD) $(CNN_LIB_INCLUDE)
 APP_CFLAGS += -Icommon -I$(MFCC_DIR) -I$(MFCCBUILD_DIR) -I$(LUT_GEN_DIR)
-APP_CFLAGS += -DPERF -DAT_MODEL_PREFIX=$(MODEL_PREFIX) $(MODEL_SIZE_CFLAGS)
+APP_CFLAGS += -DAT_MODEL_PREFIX=$(MODEL_PREFIX) $(MODEL_SIZE_CFLAGS)
 APP_CFLAGS += -DSTACK_SIZE=$(CLUSTER_STACK_SIZE) -DSLAVE_STACK_SIZE=$(CLUSTER_SLAVE_STACK_SIZE)
-APP_CFLAGS += -DAT_IMAGE=$(IMAGE) -DAT_WAV=$(WAV_PATH) #-DPRINT_WAV -DPRINT_AT_INPUT
+APP_CFLAGS += -DAT_IMAGE=$(IMAGE) -DAT_WAV=$(WAV_PATH) -DFROM_SENSOR #-DPRINT_AT_INPUT #-DPRINT_WAV 
+LIBS = -lm
 
 generate_samples:
 	python utils/generate_samples_images.py --dct_coefficient_count $(DCT_COUNT) --window_size_ms $(FRAME_SIZE_ms) --window_stride_ms $(FRAME_STEP_ms)

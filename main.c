@@ -79,16 +79,20 @@ void kws_ds_cnn(void)
         pmsis_exit(-2);
     }
     printf("Finished reading image\n");
-    #ifdef PRINT_IMAGE
-	    for (int i=0; i<H; i++){
-	        for (int j=0; j<W; j++){
-		        printf("%d, ", ImageFromFile[W*i + j]);
-	        }
-	    }
-        printf("\n");
-    #endif  /* PRINT_IMAGE */
 
     ImageIn = (KWS_IMAGE_IN_T *) ImageFromFile;
+
+    #ifdef PRINT_IMAGE
+        printf("input_at = np.arrray([\n");
+        for (int i=0; i<49; i++) {
+            printf("[");
+            for (int j=0; j<10; j++) {
+                printf("%d, ", ImageIn[i*10+j]);
+            }
+            printf("],\n");
+        }
+        printf("])\n");
+    #endif  /* PRINT_IMAGE */
 
     ResOut = (KWS_IMAGE_IN_T *) pi_l2_malloc(12 * sizeof(KWS_IMAGE_IN_T));
     if (ResOut == NULL)

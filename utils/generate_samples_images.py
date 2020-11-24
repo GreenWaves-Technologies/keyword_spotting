@@ -56,16 +56,36 @@ def get_mfcc_graph(model_settings):
 		wav_loader = io_ops.read_file(input_file_placeholder)
 		wav_decoder = audio_ops.decode_wav(wav_loader, desired_channels=1, desired_samples=model_settings['desired_samples'])
 		# Run the spectrogram and MFCC ops to get a 2D 'fingerprint' of the audio.
-		spectrogram = audio_ops.audio_spectrogram(wav_decoder.audio,
+		spectrograms_power = audio_ops.audio_spectrogram(wav_decoder.audio,
 												  window_size=model_settings['window_size_samples'],
 												  stride=model_settings['window_stride_samples'],
 												  magnitude_squared=True)
-		output = audio_ops.mfcc(spectrogram,
-								wav_decoder.sample_rate,
-								dct_coefficient_count=model_settings['dct_coefficient_count'],
-								lower_frequency_limit=20,
-								upper_frequency_limit=4000,
-								filterbank_channel_count=40)
+		USE_POWER=True
+		if USE_POWER:
+			# Warp the linear scale spectrograms into the mel-scale.
+			num_spectrogram_bins = spectrograms_power.shape[-1].value
+			lower_edge_hertz, upper_edge_hertz, num_mel_bins = 20.0, 4000.0, 40
+			linear_to_mel_weight_matrix = tf.signal.linear_to_mel_weight_matrix(
+				num_mel_bins, num_spectrogram_bins, 16000.0, lower_edge_hertz,
+				upper_edge_hertz)
+			mel_spectrograms = tf.tensordot(
+				spectrograms_power, linear_to_mel_weight_matrix, 1)
+			mel_spectrograms.set_shape(spectrograms_power.shape[:-1].concatenate(
+				linear_to_mel_weight_matrix.shape[-1:]))
+
+			# Compute a stabilized log to get log-magnitude mel-scale spectrograms.
+			log_mel_spectrograms = tf.math.log(mel_spectrograms + 1e-6)
+
+			# Compute MFCCs from log_mel_spectrograms and take the first NDCT.
+			mfccs = tf.signal.mfccs_from_log_mel_spectrograms(
+				log_mel_spectrograms)[..., :model_settings['dct_coefficient_count']]
+			#output = tf.expand_dims(mfccs, axis=0)
+			output = mfccs
+		else:
+			output = audio_ops.mfcc(
+				 spectrograms_power,
+				 wav_decoder.sample_rate,
+				 dct_coefficient_count=model_settings['dct_coefficient_count'])
 	return g, input_file_placeholder, output, wav_decoder.audio
 
 def main(_):
@@ -74,13 +94,15 @@ def main(_):
 	  	  FLAGS.window_stride_ms, FLAGS.dct_coefficient_count)
 
 	for input_file in glob.glob(FLAGS.input_file):
-		print(input_file)
 		g, input_file_placeholder, tf_mfccs, signal = get_mfcc_graph(model_settings)
 		with tf.compat.v1.Session(graph=g) as sess:
 			tf.initialize_all_variables().run()
 			tf_mfccs, signal = sess.run([tf_mfccs, signal], feed_dict={input_file_placeholder: input_file})
+
+		print("\n")
+		print(input_file)
 			
-		print("\n\nFloat MFCC: [{}..{}] with shape [{}]".format(np.min(tf_mfccs), np.max(tf_mfccs), tf_mfccs.shape))
+		print("Float MFCC: [{}..{}] with shape [{}]".format(np.min(tf_mfccs), np.max(tf_mfccs), tf_mfccs.shape))
 		tf_mfccs.astype(np.float32).tofile("samples/{}_features_float32.dat".format(filename(input_file)))
 		tf_mfccs_int8 = np.floor(tf_mfccs.astype(np.float32) / NNTOOL_INPUT_SCALE + 0.5).astype(np.int8) # Scale to int8
 		np.array(tf_mfccs_int8).tofile("samples/{}_features_int8.dat".format(filename(input_file)))
@@ -113,6 +135,7 @@ def main(_):
 			np.set_printoptions(threshold=sys.maxsize)
 			print("Predictions: ")
 			print(output)
+			print("\n\n")
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()

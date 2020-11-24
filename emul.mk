@@ -11,6 +11,7 @@ MEDIUM ?= 0
 LARGE  ?= 0
 ifeq ($(SMALL), 1)
 	MODEL_PREFIX = KWS_ds_cnn_s_quant
+	TRAINED_TFLITE_MODEL=model/$(MODEL_PREFIX)_power.tflite
 	DCT_COUNT = 10
 	FRAME_SIZE_ms = 40
 	FRAME_STEP_ms = 20
@@ -20,6 +21,7 @@ ifeq ($(SMALL), 1)
 else
 	ifeq ($(MEDIUM), 1)
 		MODEL_PREFIX = KWS_ds_cnn_m_quant
+		TRAINED_TFLITE_MODEL=model/$(MODEL_PREFIX)_power.tflite
 		DCT_COUNT = 10
 		FRAME_SIZE_ms = 40
 		FRAME_STEP_ms = 20
@@ -29,6 +31,7 @@ else
 	else
 		ifeq ($(LARGE), 1)
 			MODEL_PREFIX = KWS_ds_cnn_l_quant
+			TRAINED_TFLITE_MODEL=model/$(MODEL_PREFIX)_power.tflite
 			DCT_COUNT = 40
 			FRAME_SIZE_ms = 30
 			FRAME_STEP_ms = 10
@@ -49,7 +52,7 @@ QUANT_BITS=8
 BUILD_DIR=BUILD
 
 NNTOOL_SCRIPT_PARAMETRIC=model/nntool_script_params
-ifeq ($(DUMP_TENOSRS), 1)
+ifeq ($(DUMP_TENSORS), 1)
 	NNTOOL_SET_GRAPH_DUMP = set graph_dump_tensor 7
 endif
 NNTOOL_EXTRA_FLAGS = -q
@@ -80,7 +83,7 @@ else
 endif
 CFLAGS   += -g -O3 -D__EMUL__ $(MODEL_SIZE_CFLAGS) 
 LFLAGS    =
-LIBS      =
+LIBS      = -lm
 
 BUILD_DIR = BUILD_EMUL
 
@@ -91,7 +94,7 @@ MAIN = kws_ds_cnn_emul
 generate_samples:
 	python utils/generate_samples_images.py --dct_coefficient_count $(DCT_COUNT) --window_size_ms $(FRAME_SIZE_ms) --window_stride_ms $(FRAME_STEP_ms)
 
-all: model mfcc_model generate_samples $(MAIN)
+all: model mfcc_model $(MAIN)
 
 $(OBJS) : $(BUILD_DIR)/%.o : %.c
 	@mkdir -p $(dir $@)
