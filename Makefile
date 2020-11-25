@@ -84,7 +84,7 @@ APP_CFLAGS += -I. -I$(MODEL_COMMON_INC) -I$(TILER_EMU_INC) -I$(TILER_INC) -I$(MO
 APP_CFLAGS += -Icommon -I$(MFCC_DIR) -I$(MFCCBUILD_DIR) -I$(LUT_GEN_DIR)
 APP_CFLAGS += -DAT_MODEL_PREFIX=$(MODEL_PREFIX) $(MODEL_SIZE_CFLAGS)
 APP_CFLAGS += -DSTACK_SIZE=$(CLUSTER_STACK_SIZE) -DSLAVE_STACK_SIZE=$(CLUSTER_SLAVE_STACK_SIZE)
-APP_CFLAGS += -DAT_IMAGE=$(IMAGE) -DAT_WAV=$(WAV_PATH) -DFROM_SENSOR #-DPRINT_AT_INPUT #-DPRINT_WAV 
+APP_CFLAGS += -DAT_IMAGE=$(IMAGE) -DAT_WAV=$(WAV_PATH)  -DFROM_SENSOR -DSILENT -DWRITE_WAV #-DPRINT_AT_INPUT #-DPRINT_WAV 
 LIBS = -lm
 
 generate_samples:
@@ -97,9 +97,9 @@ test_accuracy_tflite:
 	python utils/test_accuracy_tflite.py --tflite_model $(TRAINED_TFLITE_MODEL) --dct_coefficient_count $(DCT_COUNT) --window_size_ms $(FRAME_SIZE_ms) --window_stride_ms $(FRAME_STEP_ms)
 
 # all depends on the model
-all:: model mfcc_model generate_samples
+all:: model mfcc_model #generate_samples
 
-clean:: clean_at_model clean_mfcc_model
+clean:: #clean_at_model clean_mfcc_model
 
 clean_at_model:
 	$(RM) $(MODEL_GEN_EXE)

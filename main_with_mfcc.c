@@ -46,11 +46,11 @@
 #define  INPUT_SCALE        236
 #define  INPUT_SCALEN       16
 
-#ifdef FROM_SENSOR
-    static uint8_t buff[2][WAV_BUFFER_SIZE * sizeof(short int)];
-    static struct pi_device i2s;
-#endif
+#define NB_ELEM 256
+#define BUFF_SIZE (NB_ELEM*2)
+#define ITER    64
 
+static char *LABELS[NUM_CLASSES] = {"silence", "unknown", "yes", "no", "up", "down", "left", "right", "on", "off", "stop", "go"};
 L2_MEM short int *ResOut;
 char *WavName = NULL;
 char *ImageIn;
@@ -60,6 +60,76 @@ AT_HYPERFLASH_FS_EXT_ADDR_TYPE __PREFIX(_L3_Flash) = 0;
 int num_samples;
 short int *mfcc_features;
 short int *inSig;
+int count, idx, end1, end2;
+int rec_digit;
+
+
+#ifdef FROM_SENSOR
+    static uint16_t buff[2][NB_ELEM];
+    static struct pi_device i2s;
+    static int end = 0;
+    static pi_task_t task;
+    static short *chunk;
+    #define LENGTH_AV 16
+    #define SHL 5
+    static int av[4][LENGTH_AV] ;
+    static int idx_av=0;
+    static int av_00=0,av_01=0,av_02=0,av_03=0;
+
+    static void copy_data(uint8_t *dst, uint8_t *src, uint size)
+    {
+      memcpy(dst, src, size);
+    }
+    // dump one mono channel chunk (NB_ELEM/2 16bits samples) from the i2s0 interface in dump_buff:
+    static void my_copy_data(uint16_t *dst, uint16_t *src, uint size)
+    {
+      int av_0=0,av_1=0,av_2=0,av_3=0;
+      unsigned i, j=0;
+
+      // copy 1 mono channel chunk into the dump buffer
+      for ( i=0;i<size; i++){
+        dst[i] = src[i]<<SHL;
+        av_0 += dst[i];
+      }
+
+      // assume 256 samples in the buffer
+      av_0 >>= 8;
+      
+      av_00 -= av[0][idx_av];
+      av_00 += av_0;
+      av[0][idx_av] = av_0;
+      idx_av++;
+      if (idx_av==LENGTH_AV) idx_av=0;
+
+      // offset correction (length of buff of avg values is 16)
+      for(i = 0; i < size; i++)
+        {
+          dst[i] -= (av_00>>4) ;
+        }
+
+    }
+
+    // This callback is called when a transfer is finished
+    // Just reenqueue another buffer unless we are done
+    static void end_of_capture(void *arg)
+    {
+        unsigned int size;
+
+        pi_i2s_read_status(&task, (void **)&chunk, &size);
+        my_copy_data((uint16_t *)(inSig + idx * NB_ELEM), (uint16_t *) chunk, NB_ELEM);
+        idx++;
+
+        if (idx < (ITER+ITER/2)){
+          pi_i2s_read_async(&i2s, pi_task_callback(&task, end_of_capture, NULL)); 
+          if (idx == ITER) end1 = 1;
+        }
+        else {
+          end2 = 1;
+          idx = 0;
+        }
+
+    }
+#endif
 
 static void RunMFCC(){
     L1_Memory = KWS_ds_cnn_m_quant_L1_Memory;
@@ -69,20 +139,13 @@ static void RunMFCC(){
         gap_cl_resethwtimer();
         int start, elapsed, total_cyc;
         total_cyc = 0;
+        start = gap_cl_readhwtimer();
     #endif
-    for (int i=0, j=0; i<N_FRAME*FRAME_STEP; i+=FRAME_STEP,j+=N_DCT){
-        #ifdef PERF
-            start = gap_cl_readhwtimer();
-        #endif
-        MFCC00(inSig+i, mfcc_features+j, (i)?inSig[i-1]:0, TwiddlesLUT, SwapLUT, WindowLUT, MFCC_FilterBank,
-                    MFCC_Coeffs, FRAME_SIZE, N_FFT, off_shift, NUMCEP, 5, N_DCT, DCT_Coeff, lift_coeff);
-        #ifdef PERF
-            elapsed = gap_cl_readhwtimer() - start;
-            total_cyc += elapsed;
-        #endif
-    }
+    MFCC(inSig+(count-1)%2*WAV_BUFFER_SIZE/2, mfcc_features, 0, TwiddlesLUT, SwapLUT, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, 5, N_DCT, DCT_Coeff);
     #ifdef PERF
-      printf("MFCC Total Cycles: %d\n\n\n", total_cyc);
+        elapsed = gap_cl_readhwtimer() - start;
+        total_cyc += elapsed;
+        printf("MFCC Total Cycles: %d\n\n\n", total_cyc);
     #endif
 }
 
@@ -96,7 +159,7 @@ static void Runkws()
   __PREFIX(CNN)(ImageIn, ResOut);
 
   //Checki Results
-  int rec_digit = 0;
+  rec_digit = 0;
   int highest = ResOut[0];
   PRINTF("Results: \n");
   for(int i = 0; i < NUM_CLASSES; i++) {
@@ -106,43 +169,15 @@ static void Runkws()
     }
     PRINTF("class %d: %d\n", i, ResOut[i]);
   }
+  if (highest < 7000) rec_digit = 1;
 
-  PRINTF("\nRecognized:\t%d\n", rec_digit);
+  printf("Recognized:\t%s\n", LABELS[rec_digit]);
 }
 
 
 void kws_ds_cnn(void)
 {
     printf("Entering main controller\n");
-    #ifdef FROM_SENSOR
-        // Get default I2S interface config
-        struct pi_i2s_conf i2s_conf;
-        pi_i2s_conf_init(&i2s_conf);
-
-        // Configure first interface for PDM 44100KHz DDR
-        // Also gives the 2 buffers for double-buffering the sampling
-        i2s_conf.pingpong_buffers[0] = buff[0];
-        i2s_conf.pingpong_buffers[1] = buff[1];
-        i2s_conf.block_size = WAV_BUFFER_SIZE * sizeof(short int);
-        i2s_conf.frame_clk_freq = 16000;
-        //i2s_conf.frame_clk_freq = 48000;
-        i2s_conf.itf = 0;
-        i2s_conf.channels = 1;
-        i2s_conf.format = PI_I2S_FMT_DATA_FORMAT_PDM;
-        i2s_conf.word_size = 16;
-
-        pi_open_from_conf(&i2s, &i2s_conf);
-
-        // Open the driver
-        if (pi_i2s_open(&i2s))
-          pmsis_exit(1);  
-
-        // Start sampling, the driver will use the double-buffers we provided to store
-        // the incoming samples
-        if (pi_i2s_ioctl(&i2s, PI_I2S_IOCTL_START, NULL))
-          pmsis_exit(1);
-
-    #endif
     #ifndef __EMUL__
         /* Configure And open cluster. */
         struct pi_device cluster_dev;
@@ -159,7 +194,7 @@ void kws_ds_cnn(void)
     ResOut        = (short int *) pi_l2_malloc(NUM_CLASSES                      * sizeof(short int));
     ImageIn       = (char *)      pi_l2_malloc(AT_INPUT_WIDTH * AT_INPUT_HEIGHT * sizeof(char));
     mfcc_features = (short int *) pi_l2_malloc(N_FRAME * N_DCT                  * sizeof(short int));
-    inSig         = (short int *) pi_l2_malloc(WAV_BUFFER_SIZE                  * sizeof(short int));
+    inSig         = (short int *) pi_l2_malloc(NB_ELEM * (ITER + ITER/2)        * sizeof(short int));
     if (mfcc_features==NULL || ImageIn==NULL || inSig==NULL || ResOut==NULL){
         printf("Error allocating output\n");
         pmsis_exit(1);
@@ -175,7 +210,38 @@ void kws_ds_cnn(void)
         pmsis_exit(-5);
     }
 
-int count=0;
+    #ifdef FROM_SENSOR
+        // Get default I2S interface config
+        struct pi_i2s_conf i2s_conf;
+        pi_i2s_conf_init(&i2s_conf);
+
+        // Configure first interface for PDM 44100KHz DDR
+        // Also gives the 2 buffers for double-buffering the sampling
+        i2s_conf.pingpong_buffers[0] = buff[0];
+        i2s_conf.pingpong_buffers[1] = buff[1];
+        i2s_conf.block_size = NB_ELEM*sizeof(short);
+        i2s_conf.frame_clk_freq = 16000;
+        i2s_conf.itf = 0;
+        i2s_conf.channels = 1;
+        i2s_conf.format = PI_I2S_FMT_DATA_FORMAT_PDM;
+        i2s_conf.word_size = 16;
+
+        pi_open_from_conf(&i2s, &i2s_conf);
+
+        // Open the driver
+        if (pi_i2s_open(&i2s))
+          pmsis_exit(1);  
+
+        // Start sampling, the driver will use the double-buffers we provided to store
+        // the incoming samples
+        if (pi_i2s_ioctl(&i2s, PI_I2S_IOCTL_START, NULL))
+          pmsis_exit(1);
+        pi_time_wait_us(1000);
+    #endif
+
+count=0;
+idx = 0;
+end1 = end2 = 0;
 while(1)
 {
     #ifndef FROM_SENSOR
@@ -188,19 +254,23 @@ while(1)
     #else
         unsigned int size;
 
-        // Capture a few samples
-        printf("Capturing data... %d\n", count);
-        pi_time_wait_us(1000);
-
         // Once it returns, chunk will point to the next available buffer
         // containing samples.
-        pi_i2s_read(&i2s, (void **)&inSig, &size);
+        pi_i2s_read_async(&i2s, pi_task_callback(&task, end_of_capture, NULL));
+        // Wait until acquisition is finished
+        while(end1==0 && end2==0)
+          {
+            pi_yield();
+          }
+        count++;
+        if (end1) end1 = 0;
+        if (end2) end2 = 0;
 
         #ifdef WRITE_WAV
             char FileName[100];
-            sprintf(FileName, "../../../from_gap_%d.wav", count++);
+            sprintf(FileName, "../../../from_gap_%d_%s.wav", count, LABELS[rec_digit]);
             WriteWavToFile(FileName, i2s_conf.word_size, i2s_conf.frame_clk_freq,
-                 i2s_conf.channels, (void *)inSig, WAV_BUFFER_SIZE * sizeof(short int));
+                 i2s_conf.channels, (void *)inSig+(count-1)%2*WAV_BUFFER_SIZE/2, WAV_BUFFER_SIZE * sizeof(short int));
         #endif
     #endif
 
@@ -217,6 +287,7 @@ while(1)
     #endif
 
     for (int i=0; i<N_FRAME; i++) {
+        // Take only the first N_CEP that you need (in this case 10)
         for (int j=0; j<10; j++) {
             ImageIn[i*AT_INPUT_WIDTH+j] = (char) gap_roundnorm(mfcc_features[i*N_DCT+j]*INPUT_SCALE, INPUT_SCALEN);
         }
