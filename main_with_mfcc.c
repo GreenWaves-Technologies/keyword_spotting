@@ -7,19 +7,6 @@
  *
  */
 
-#define __XSTR(__s) __STR(__s)
-#define __STR(__s) #__s 
-
-#ifndef __EMUL__
-	/* PMSIS includes. */
-	#include "pmsis.h"
-    #include <bsp/bsp.h>
-#else
-	#define pmsis_exit exit
-	#define pi_l2_malloc malloc
-	#define pi_l2_free(ptr,size) free(ptr)
-#endif  /* __EMUL__ */
-
 /* Autotiler includes. */
 #include "Gap.h"
 #ifdef SMALL
@@ -178,18 +165,16 @@ static void Runkws()
 void kws_ds_cnn(void)
 {
     printf("Entering main controller\n");
-    #ifndef __EMUL__
-        /* Configure And open cluster. */
-        struct pi_device cluster_dev;
-        struct pi_cluster_conf cl_conf;
-        cl_conf.id = 0;
-        pi_open_from_conf(&cluster_dev, (void *) &cl_conf);
-        if (pi_cluster_open(&cluster_dev))
-        {
-            printf("Cluster open failed !\n");
-            pmsis_exit(-4);
-        }
-    #endif  /* __EMUL__ */
+    /* Configure And open cluster. */
+    struct pi_device cluster_dev;
+    struct pi_cluster_conf cl_conf;
+    cl_conf.id = 0;
+    pi_open_from_conf(&cluster_dev, (void *) &cl_conf);
+    if (pi_cluster_open(&cluster_dev))
+    {
+        printf("Cluster open failed !\n");
+        pmsis_exit(-4);
+    }
     
     ResOut        = (short int *) pi_l2_malloc(NUM_CLASSES                      * sizeof(short int));
     ImageIn       = (char *)      pi_l2_malloc(AT_INPUT_WIDTH * AT_INPUT_HEIGHT * sizeof(char));
@@ -274,17 +259,12 @@ while(1)
         #endif
     #endif
 
-    #ifndef __EMUL__
-        struct pi_cluster_task task_mfcc = {0};
-        task_mfcc.entry = RunMFCC;
-        task_mfcc.arg = NULL;
-        task_mfcc.stack_size = (unsigned int) STACK_SIZE;
-        task_mfcc.slave_stack_size = SLAVE_STACK_SIZE;
-        pi_cluster_send_task_to_cl(&cluster_dev, &task_mfcc);
-        //pi_l2_free(inSig, WAV_BUFFER_SIZE * sizeof(short int));
-    #else
-        RunMFCC();
-    #endif
+    struct pi_cluster_task task_mfcc = {0};
+    task_mfcc.entry = RunMFCC;
+    task_mfcc.arg = NULL;
+    task_mfcc.stack_size = (unsigned int) STACK_SIZE;
+    task_mfcc.slave_stack_size = SLAVE_STACK_SIZE;
+    pi_cluster_send_task_to_cl(&cluster_dev, &task_mfcc);
 
     for (int i=0; i<N_FRAME; i++) {
         // Take only the first N_CEP that you need (in this case 10)
@@ -293,48 +273,20 @@ while(1)
         }
     }
 
-    #ifdef PRINT_AT_INPUT
-        printf("input_prescale_gap = np.array([\n");
-        for (int i=0; i<N_FRAME; i++) {
-            printf("[");
-            for (int j=0; j<N_DCT; j++) {
-                printf("%d, ", mfcc_features[i*N_DCT+j]);
-            }
-            printf("],\n");
-        }
-        printf("])\n");
-        printf("input_gap = np.array([\n");
-        for (int i=0; i<N_FRAME; i++) {
-            printf("[");
-            for (int j=0; j<N_DCT; j++) {
-                printf("%d, ", ImageIn[i*AT_INPUT_WIDTH+j]);
-            }
-            printf("],\n");
-        }
-        printf("])\n");
-    #endif
-    #ifndef __EMUL__
-        //pi_l2_free(mfcc_features, N_FRAME * N_DCT * sizeof(short int));
-    #endif
-
     PRINTF("Call cluster\n");
-	#ifndef __EMUL__
-		struct pi_cluster_task *task_net = pmsis_l2_malloc(sizeof(struct pi_cluster_task));
-		if(task_net==NULL) {
-		  printf("pi_cluster_task alloc Error!\n");
-		  pmsis_exit(-1);
-		}
-		//PRINTF("Stack size is %d and %d\n",STACK_SIZE,SLAVE_STACK_SIZE );
-		memset(task_net, 0, sizeof(struct pi_cluster_task));
-		task_net->entry = &Runkws;
-		task_net->stack_size = STACK_SIZE;
-		task_net->slave_stack_size = SLAVE_STACK_SIZE;
-		task_net->arg = NULL;
-		pi_cluster_send_task_to_cl(&cluster_dev, task_net);
-	#else
-	    Runkws();
-        break;
-	#endif
+	struct pi_cluster_task *task_net = pmsis_l2_malloc(sizeof(struct pi_cluster_task));
+	if(task_net==NULL) {
+	  printf("pi_cluster_task alloc Error!\n");
+	  pmsis_exit(-1);
+	}
+	//PRINTF("Stack size is %d and %d\n",STACK_SIZE,SLAVE_STACK_SIZE );
+	memset(task_net, 0, sizeof(struct pi_cluster_task));
+	task_net->entry = &Runkws;
+	task_net->stack_size = STACK_SIZE;
+	task_net->slave_stack_size = SLAVE_STACK_SIZE;
+	task_net->arg = NULL;
+	pi_cluster_send_task_to_cl(&cluster_dev, task_net);
+
     #ifdef PERF
     {
         unsigned int TotalCycles = 0, TotalOper = 0;
@@ -359,38 +311,21 @@ while(1)
     #endif
     __PREFIX(CNN_Destruct)();
 
-    #ifndef __EMUL__    
-        pi_l2_free(ImageIn, AT_INPUT_WIDTH * AT_INPUT_HEIGHT * sizeof(char));
-        pi_l2_free(ResOut,  NUM_CLASSES*sizeof(short int));
-        // Close the cluster
-        pi_cluster_close(&cluster_dev);
-    #endif
+    pi_l2_free(ImageIn, AT_INPUT_WIDTH * AT_INPUT_HEIGHT * sizeof(char));
+    pi_l2_free(ResOut,  NUM_CLASSES*sizeof(short int));
+    // Close the cluster
+    pi_cluster_close(&cluster_dev);
     PRINTF("Ended\n");
     pmsis_exit(0);
 }
 
 
-#ifndef __EMUL__
 int main()
 {
-	PRINTF("\n\n\t *** NNTOOL KWS Example ***\n\n");
+	PRINTF("\n\n\t *** KWS ***\n\n");
 
     #define __XSTR(__s) __STR(__s)
     #define __STR(__s) #__s
     WavName = __XSTR(AT_WAV);
     return pmsis_kickoff((void *) kws_ds_cnn);
 }
-#else
-int main(int argc, char *argv[])
-{
-    if (argc < 2)
-    {
-        PRINTF("Usage: mnist [image_file]\n");
-        exit(-1);
-    }
-    WavName = argv[1];
-    PRINTF("\n\n\t *** IMAGENET EMUL ***\n\n");
-    kws_ds_cnn();
-    return 0;
-}
-#endif

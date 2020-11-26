@@ -5,7 +5,7 @@
 # of the BSD license.  See the LICENSE file for details.
 
 DUMP_TENSORS ?= 1
-WITH_MFCC ?= 0
+WITH_MFCC ?= 1
 SMALL  ?= 0
 MEDIUM ?= 0
 LARGE  ?= 0
@@ -72,14 +72,12 @@ include mfcc_model.mk
 MODEL_GEN_EXTRA_FLAGS= -f $(MODEL_BUILD)
 CC = gcc
 
+SRCS      = main_emulation.c $(MODEL_GEN_C) $(MODEL_COMMON_SRCS) $(CNN_LIB)
+SRCS 	  += common/wavIO.c $(MFCCBUILD_DIR)/MFCCKernels.c $(MFCC_DIR)/MfccBasicKernels.c $(MFCC_DIR)/FFTLib.c
+INCLUDES  = -I. -I$(TILER_EMU_INC) -I$(TILER_INC) $(CNN_LIB_INCLUDE) -I$(MODEL_BUILD) -I$(GAP_SDK_HOME)/libs/gap_lib/include
+INCLUDES  += -Icommon -I$(MFCC_DIR) -I$(MFCCBUILD_DIR) -I$(LUT_GEN_DIR)
 ifeq ($(WITH_MFCC), 1)
-	SRCS      = main_with_mfcc.c $(MODEL_GEN_C) $(MODEL_COMMON_SRCS) $(CNN_LIB)
-	SRCS 	  += common/wavIO.c $(MFCCBUILD_DIR)/MFCCKernels.c $(MFCC_DIR)/MfccBasicKernels.c $(MFCC_DIR)/FFTLib.c
-	INCLUDES  = -I. -I$(TILER_EMU_INC) -I$(TILER_INC) $(CNN_LIB_INCLUDE) -I$(MODEL_BUILD) -I$(GAP_SDK_HOME)/libs/gap_lib/include
-	INCLUDES  += -Icommon -I$(MFCC_DIR) -I$(MFCCBUILD_DIR) -I$(LUT_GEN_DIR)
-else
-	SRCS      = main.c $(MODEL_GEN_C) $(MODEL_COMMON_SRCS) $(CNN_LIB)
-	INCLUDES  = -I. -I$(TILER_EMU_INC) -I$(TILER_INC) $(CNN_LIB_INCLUDE) -I$(MODEL_BUILD) -I$(GAP_SDK_HOME)/libs/gap_lib/include
+	CFLAGS += -DWITH_MFCC
 endif
 CFLAGS   += -g -O3 -D__EMUL__ $(MODEL_SIZE_CFLAGS) 
 LFLAGS    =
