@@ -1,0 +1,3 @@
+[submodule "ML-KWS-for-GAP-training"]
+	path = ML-KWS-for-GAP-training
+	url = git@gitlab.greenwaves-tech.com:gwt_app_developer/ML-KWS-for-GAP-training.git
