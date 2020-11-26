@@ -1,8 +1,9 @@
 #include "Gap.h"
 #include "FFTLib.h"
 
-#define AT_NORM(x, n)	gap_norm_reg((x), (n))
 //#define HIGH_PREC_FFT
+
+#define AT_NORM(x, n)	gap_norm_reg((x), (n))
 
 typedef struct mfcc_params {
   short int in_freq;
@@ -43,6 +44,7 @@ typedef struct {
   short int * __restrict__ Frame;
   short int * __restrict__ Out;
   short int Prev;
+  short int PreempFactor; 
   short int *Shift;
   int FrameSize;
   int maxin[8];
@@ -134,7 +136,6 @@ typedef struct {
         int FrameSize;					/**< Frame dimension */
         int shift;					/**< scale dimension */
 } lifter_args_T;
-
 
 void MFCC_PreEmphasis(MFCC_PreEmphasis_T *Arg);
 void MFCC_WindowedFrame(MFCC_WF_T *Arg);

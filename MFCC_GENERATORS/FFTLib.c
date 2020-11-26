@@ -575,9 +575,9 @@ static void Radix4FFTKernel_Twiddle0(v2s *InOutA, v2s *InOutB, v2s *InOutC, v2s 
 
   /* Used for IFFT here.
      IFFT uses (1,  1,  1,  1)  FFT uses (1,  1,  1,  1)
-     (1,  j, -1, -j)	       (1, -j, -1,  j)
-     (1, -1,  1, -1)	       (1, -1,  1, -1)
-     (1, -j, -1,  j)	       (1,  j, -1, -j)
+               (1,  j, -1, -j)   	       (1, -j, -1,  j)
+               (1, -1,  1, -1)   	       (1, -1,  1, -1)
+               (1, -j, -1,  j)   	       (1,  j, -1, -j)
      To use this code for FFT:
    *InOutA = ((A + C) +	           (B + D ));
    *InOutB = ((A - C) + gap8_sub2rotmj(B,  D));
@@ -1273,14 +1273,6 @@ static void RadixMixedFFT_DIF_Par_Ker(FFT_Arg_T *Arg)
     iL <<= 2; iM >>= 2;
     // Synchronize all cores for current layer of the trellis
     gap_waitbarrier(0);
-
-    #ifdef DBGFFT
-      if (CoreId==0) {
-        printf("stage %d\n",iCnt1);
-        printout_scale((void*)DataV, N_fft,(iCnt1==0)?16:(1<<(2*(iCnt1+2))));
-      }
-      gap_waitbarrier(0);
-    #endif
   }
 
   // This stage will work for nfft > 32 (il=4 im=4) for 8 cores
@@ -1418,16 +1410,6 @@ static void Radix2FFT_DIF_Par_Ker(FFT_Arg_T *Arg)
     iM >>= 1;
 
     gap_waitbarrier(0);
-#ifdef DBGFFT
-      if (CoreId==0) {
-        printf("stage %d\n",iCnt1);
-	for (int i=0;i<N_FFT2;i++) {
-	  printf("%d %d %d\n",i,DataV[i][0],DataV[i][1]);
-	}
-	//printout_scale((void*)DataV, N_FFT2,(iCnt1==0)?4:(1<<(iCnt1+2)));
-      }
-      gap_waitbarrier(0);
-#endif
   }
 
   // Layer iLog2N - 3
@@ -1451,16 +1433,6 @@ static void Radix2FFT_DIF_Par_Ker(FFT_Arg_T *Arg)
   }
   gap_waitbarrier(0);
 
-  #ifdef DBGFFT
-    if (CoreId==0) {
-      printf("stage %d\n",iCnt1);
-      for (int i=0;i<N_FFT2;i++) {
-	printf("%d %d %d\n",i,DataV[i][0],DataV[i][1]);
-      }
-      //printout_scale((void*)DataV, N_FFT2,1);
-    }
-  #endif
-
   // Layer iLog2N - 2
   iM = 2; iL = (N_FFT2>>(1+1)); iQ = 0;
   for (iCnt2 = 0; iCnt2 < iM; ++iCnt2) {
@@ -1482,16 +1454,6 @@ static void Radix2FFT_DIF_Par_Ker(FFT_Arg_T *Arg)
   }
   gap_waitbarrier(0);
 
-#ifdef DBGFFT
-    if (CoreId==0) {
-      printf("stage %d\n",iCnt1+1);
-      for (int i=0;i<N_FFT2;i++) {
-	printf("%d %d %d\n",i,DataV[i][0],DataV[i][1]);
-      }
-    }
-    gap_waitbarrier(0);
-#endif
-
   /* Last Layer: W = (1, 0) */
   Chunk = ((N_FFT2>>1)/gap_ncore()); First =  CoreId*Chunk; Last = Min(First+Chunk, (N_FFT2>>1));
   iA = 2*Chunk*CoreId;
@@ -1504,18 +1466,6 @@ static void Radix2FFT_DIF_Par_Ker(FFT_Arg_T *Arg)
     iA = iA + 2;
   }
   gap_waitbarrier(0);
-
-  #ifdef DBGFFT
-    if (CoreId==0) {
-      printf("stage %d\n",iCnt1+2);
-      for (int i=0;i<N_FFT2;i++) {
-	printf("%d %d %d\n",i,DataV[i][0],DataV[i][1]);
-	//printout_scale((void*)DataV, N_FFT2,(1<<(iCnt1+1+2)));
-      }
-    }
-    gap_waitbarrier(0);
-  #endif
-
 }
 
 

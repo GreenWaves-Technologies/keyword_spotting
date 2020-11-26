@@ -14,4 +14,5 @@
 #define DO_DCT          1
 
 #define USE_POWER		1
+
 #define LIFTER_COEFF    0

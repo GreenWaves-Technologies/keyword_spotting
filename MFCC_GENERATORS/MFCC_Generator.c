@@ -13,6 +13,16 @@
 #include "AutoTilerLibTypes.h"
 #include "MFCC_Generator.h"
 
+#define D0      KER_ITER_D0
+#define D1      KER_ITER_D1
+#define D2      KER_ITER_D2
+#define D3      KER_ITER_D3
+#define T0      KER_ITER_TILE0
+#define T1      KER_ITER_TILE1
+#define T2      KER_ITER_TILE2
+
+//#define HIGH_PREC_FFT
+
 void LoadMFCCLibrary()
 
 {
@@ -101,6 +111,20 @@ void LoadMFCCLibrary()
 		  "MFCC_WF_T",NULL
 	);
 
+        LibKernel("PreempWindowing", CALL_PARALLEL,
+		  CArgs(8,
+			TCArg("short int * __restrict__"   , "Frame"),
+			TCArg("short int * __restrict__"   , "OutFrame"),
+			TCArg("short int * __restrict__"   , "Window"),
+			TCArg("short int *", "Shift"),
+			TCArg("short int", "Prev"),
+			TCArg("short int", "PreempFactor"),
+			TCArg("int16_t", "FrameSize"),
+			TCArg("int16_t", "FFT_Dim")
+			),
+		  "PreempWin_Args_T",NULL
+	);
+
         LibKernel("MFCC_WindowedFrame_int", CALL_PARALLEL,
 		  CArgs(5,
 			TCArg("short int * __restrict__"   , "Frame"),
@@ -113,10 +137,11 @@ void LoadMFCCLibrary()
 		  );
 
         LibKernel("MFCC_PreEmphasis", CALL_PARALLEL,
-		  CArgs(5,
+		  CArgs(6,
 			TCArg("short int * __restrict__"   , "Frame"),
 			TCArg("short int * __restrict__"   , "Out"),
 			TCArg("short int", "Prev"),
+			TCArg("short int", "PreempFactor"),
 			TCArg("short int *", "Shift"),
 			TCArg("short int", "FrameSize")
 			),
@@ -312,7 +337,7 @@ void GeneratorMFCC(char *Name, int FrameSize, int n_fft, int numcep, int mfcc_co
 
 }
 
-void MFCC_parallel(char *Name, int FrameSize, int n_fft, int numcep, int mfcc_coeff_cnt, int do_dct, int do_lifter, int fft_radix_type, int n_dct, int MFCCFromPower)
+void MFCC_parallel(char *Name, int FrameSize, int n_fft, int numcep, int mfcc_coeff_cnt, int do_dct, int do_lifter, int fft_radix_type, int n_dct, int MFCCFromPower, float PreempFactor)
 {
 
   int nbcalls = do_dct?9:8;
@@ -356,15 +381,16 @@ void MFCC_parallel(char *Name, int FrameSize, int n_fft, int numcep, int mfcc_co
 		   TILE_HOR,
 		   KCArgs,
 		   Calls(nbcalls,
-			 Call("MFCC_PreEmphasis",LOC_LOOP,
-			      Bindings(5,
-				       K_Arg("In"   , KER_ARG_TILE),
-				       K_Arg("inout1"   , KER_ARG_TILE),
-				       C_Arg("Prev"),
-				       K_Arg("shiftbuf"   , KER_ARG_TILE),
-				       C_Arg("FrameSize")
-				       )
-			      ),
+			Call("MFCC_PreEmphasis",LOC_LOOP,
+			     Bindings(6,
+			       K_Arg("In"   , KER_ARG_TILE),
+			       K_Arg("InOut1"   , KER_ARG_TILE),
+			       C_Arg("Prev"),
+			       Imm(FP2FIX(PreempFactor, 15)),
+			       K_Arg("Shift"   , KER_ARG_TILE),
+			       Imm(FrameSize)
+			       )
+			     ),
 #ifdef HIGH_PREC_FFT
 			 Call("MFCC_WindowedFrame_int",LOC_LOOP,
 			      Bindings(5,
@@ -375,6 +401,15 @@ void MFCC_parallel(char *Name, int FrameSize, int n_fft, int numcep, int mfcc_co
 				       C_Arg("nfft")
 				       )
 			      ),
+			 fft_radix_type?
+			 Call("RadixMixedFFT_DIF_Par",LOC_LOOP,
+			      Bindings(4,
+				       K_Arg("Out_fft"     , KER_ARG_TILE),
+				       K_Arg("Twiddles_fft", KER_ARG_TILE),
+				       K_Arg("shift_fft"    , KER_ARG_TILE),
+				       C_Arg("nfft")
+				       )
+			      ):
 			 Call("Radix2FFT_DIF_INT_Scal_Par",LOC_LOOP,
 			      Bindings(4,
 				       K_Arg("Out_fft"     , KER_ARG_TILE),
@@ -519,8 +554,7 @@ void MFCC_parallel(char *Name, int FrameSize, int n_fft, int numcep, int mfcc_co
 
 }
 
-#if 0
-static int MFCC2D_Generator(
+void MFCC2D_Generator(
 	char *Name,
 	CNN_GenControl_T *Ctrl,
 	int NFrames,
@@ -529,16 +563,19 @@ static int MFCC2D_Generator(
 	int Nfft,
 	int NMFCCCoeff,
 	int Ndct,
+	float PreempFactor,
 	int do_dct,
-	int do_lifter
+	int do_lifter,
+	int high_prec_fft
 	)
 {
 	Kernel_T *Kernel = UserKernel(Name,
                 KernelIterSpace(2, IterFixedSpace(D0, NFrames), IterTiledSpace(T0)),
                 TILE_HOR,
-                CArgs((do_dct?17:12)+(do_lifter?1:0),
+                CArgs((do_dct?11:9)+(do_lifter?1:0),
                 	TCArg("int16_t * __restrict__",      "In"),
 			TCArg("int16_t * __restrict__",      "Out"),
+			TCArg("int16_t", "Prev"),
 			TCArg("int16_t * __restrict__",      "Twiddles_fft"),
 			TCArg("int16_t * __restrict__",      "SwapTable_fft"),
 			TCArg("int16_t * __restrict__",      "WinTable"),
@@ -550,59 +587,119 @@ static int MFCC2D_Generator(
 			do_lifter?TCArg("int16_t * __restrict__", "lift_coeff"):AT_NO_C_ARG
                 ),
                 Calls(do_dct?9:8,
-			Call("MFCC_WindowedFrame",LOC_LOOP,
-			     Bindings(5,
-			       K_Arg("In",       KER_ARG_TILE),
-			       K_Arg("InOut1",   KER_ARG_TILE),
-			       K_Arg("WinTable", KER_ARG_TILE),
-			       Imm(FrameSize),
-			       Imm(Nfft)
+			Call("MFCC_PreEmphasis",LOC_LOOP,
+			     Bindings(6,
+			       K_Arg("In"   , KER_ARG_TILE),
+			       K_Arg("InOut1"   , KER_ARG_TILE),
+			       C_Arg("Prev"),
+			       Imm(FP2FIX(PreempFactor, 15)),
+			       K_Arg("Shift"   , KER_ARG_TILE),
+			       Imm(FrameSize)
 			       )
 			     ),
-			Call("Radix2FFT_DIF_Par",LOC_LOOP,
-			     Bindings(4,
-			       K_Arg("InOut1",       KER_ARG_TILE),
-			       K_Arg("Twiddles_fft", KER_ARG_TILE ),
-			       K_Arg("shift_fft",    KER_ARG_TILE),
-			       Imm(Nfft)
-			       )
-			     ),
-			Call("SwapSamples_Par",LOC_LOOP,
-			     Bindings(3,
-			       K_Arg("InOut1",       KER_ARG_TILE),
-			       K_Arg("SwapTable_fft", KER_ARG_TILE),
-			       Imm(Nfft)
-			       )
-			     ),
-			Call("MFCC_PowerV2S",LOC_LOOP,
-			     Bindings(4,
-			       K_Arg("InOut1",   KER_ARG_TILE),
-			       K_Arg("InOut2",   KER_ARG_TILE),
-			       K_Arg("shift_fft", KER_ARG_TILE),
-			       Imm(Nfft)
-			       )
-			     ),
-			Call("MFCC_ComputeMFCC", LOC_LOOP,
-			      Bindings(5,
-				K_Arg("InOut2",           KER_ARG_TILE),
-				K_Arg("InOut1", KER_ARG_TILE),
-				K_Arg("MFCC_FilterBank",   KER_ARG_TILE),
-				K_Arg("MFCC_Coeffs",       KER_ARG_TILE),
-				Imm(Ndct)
-				)
-			      ),
+			(high_prec_fft==0)?
+				Call("MFCC_WindowedFrame",LOC_LOOP,
+				     Bindings(5,
+				       K_Arg("InOut1"  , KER_ARG_TILE),
+				       K_Arg("Out_fft" , KER_ARG_TILE),
+				       K_Arg("WinTable" , KER_ARG_TILE ),
+				       Imm(FrameSize),
+				       Imm(Nfft)
+				       )
+				     ):
+				Call("MFCC_WindowedFrame_int",LOC_LOOP,
+				     Bindings(5,
+				       K_Arg("InOut1"  , KER_ARG_TILE),
+				       K_Arg("Out_fft" , KER_ARG_TILE),
+				       K_Arg("WinTable" , KER_ARG_TILE ),
+				       Imm(FrameSize),
+				       Imm(Nfft)
+				       )
+				     ),
+			(high_prec_fft==0)?			
+				Call("Radix2FFT_DIF_Par",LOC_LOOP,
+				     Bindings(4,
+				       K_Arg("Out_fft",       KER_ARG_TILE),
+				       K_Arg("Twiddles_fft", KER_ARG_TILE ),
+				       K_Arg("shift_fft", KER_ARG_TILE), //shift_fft buffer
+				       Imm(Nfft)
+				       )
+				     ):
+				Call("Radix2FFT_DIF_INT_Scal_Par",LOC_LOOP,
+				      Bindings(4,
+				       K_Arg("Out_fft",       KER_ARG_TILE),
+				       K_Arg("Twiddles_fft", KER_ARG_TILE ),
+				       K_Arg("shift_fft", KER_ARG_TILE), //shift_fft buffer
+				       Imm(Nfft)
+				      )
+				     ),
+			(high_prec_fft==0)?
+				Call("SwapSamples_Par",LOC_LOOP,
+				     Bindings(3,
+				       K_Arg("Out_fft",       KER_ARG_TILE),
+				       K_Arg("SwapTable_fft", KER_ARG_TILE),
+				       Imm(Nfft)
+				       )
+				     ):
+				Call("SwapSamples_scal",LOC_LOOP,
+				      Bindings(4,
+				       K_Arg("Out_fft",       KER_ARG_TILE),
+				       K_Arg("SwapTable_fft", KER_ARG_TILE),
+				       K_Arg("shift_fft", KER_ARG_TILE), //shift_fft buffer
+				       Imm(Nfft)
+				      )
+				     ),
+			(high_prec_fft==0)?
+				Call("MFCC_PowerV2S",LOC_LOOP,
+				     Bindings(4,
+				       K_Arg("Out_fft",   KER_ARG_TILE),
+				       K_Arg("InOut1",   KER_ARG_TILE),
+				       K_Arg("shift_fft", KER_ARG_TILE), //shift_fft buffer
+				       Imm(Nfft)
+				       )
+				     ):
+				Call("MFCC_Power",LOC_LOOP,
+				      Bindings(4,
+				       K_Arg("Out_fft",   KER_ARG_TILE),
+				       K_Arg("InOut1",   KER_ARG_TILE),
+				       K_Arg("shift_fft", KER_ARG_TILE), //shift_fft buffer
+				       Imm(Nfft)
+				      )
+				     ),
+			(high_prec_fft==0)?
+				Call("MFCC_ComputeMFCC", LOC_LOOP,
+				      Bindings(5,
+					K_Arg("InOut1",           KER_ARG_TILE),
+					K_Arg("InOut2", KER_ARG_TILE),
+					K_Arg("MFCC_FilterBank",   KER_ARG_TILE),
+					K_Arg("MFCC_Coeffs",       KER_ARG_TILE),
+					Imm(Ndct)
+					)
+				      ):
+				Call("MFCC_ComputeMFCC_BFF", LOC_LOOP,
+				      Bindings(7,
+					       K_Arg("InOut1"   	  , KER_ARG_TILE),
+					       K_Arg("InOut2"   	  , KER_ARG_TILE),
+					       K_Arg("MFCC_FilterBank", KER_ARG_TILE),
+					       K_Arg("MFCC_Coeffs"    , KER_ARG_TILE),
+					       K_Arg("shift_fft"      , KER_ARG_TILE),
+					       K_Arg("shift_bf"       , KER_ARG_TILE),
+					       Imm(Ndct)
+					)
+				      ),
+
 			Call("MFCC_ComputeLog",LOC_LOOP,
 			     Bindings(5,
-			 	K_Arg("InOut1", KER_ARG_TILE),
+			 	K_Arg("InOut2", KER_ARG_TILE),
 				Imm(Ndct),
-				Imm(0), // PreEmphasis Shift
+				K_Arg("Shift",  KER_ARG_TILE), // PreEmphasis Shift
 				Imm(0), // offshift
-				Imm(0)  // Shift buffer in case of High precision FFT
+			       	K_Arg("shift_fft", KER_ARG_TILE) //shift_fft buffer
 				)
 			      ),
 			Call("norm_clip_16",LOC_LOOP,
 			     Bindings(3,
-			       K_Arg("InOut1", KER_ARG_TILE),
+			       K_Arg("InOut2", KER_ARG_TILE),
 			       C_Arg("Norm"),
 			       Imm(Ndct)
 			       )
@@ -610,7 +707,7 @@ static int MFCC2D_Generator(
 			do_dct?
 			Call("MFCC_ComputeDCT_II",LOC_LOOP,
 			     Bindings(6,
-			       K_Arg("InOut1", KER_ARG_TILE),
+			       K_Arg("InOut2", KER_ARG_TILE),
 			       K_Arg("DCT_Coeff",         KER_ARG_TILE),
 			       do_lifter?K_Arg("lift_coeff",        KER_ARG_TILE):Imm(0),
 			       K_Arg("Out",            KER_ARG_TILE),
@@ -619,22 +716,25 @@ static int MFCC2D_Generator(
 			       )
 			     ):AT_NO_CALL
 		),
-		KerArgs(do_dct?14:12,
-			KerArg("In",              KerArgSpace(1,D0), O_IN|O_DB,		  FrameStride*(NFrames-1)+FrameSize, 1,       sizeof(short int),    0, 0, 0, "In"),
-			KerArg("Out",         	  KerArgSpace(1,T0), O_BUFF,   		  Ndct,         		     NFrames, sizeof(short int),    0, 0, 0, "Out"),
-			KerArg("InOut1",          KerArgSpace(1,T0), O_BUFF,   		  2*Nfft,       		     1,       sizeof(int),          0, 0, 0, ""),
-			KerArg("InOut2",          KerArgSpace(1,T0), O_BUFF,   		  2*Nfft,       		     1,       sizeof(int),          0, 0, 0, ""),
-			KerArg("WinTable",        KerArgSpace(1,T0), O_IN|O_BUFF|O_CONST, Nfft,         		     1,       sizeof(short int),    0, 0, 0, "WinTable"),
-			KerArg("Twiddles_fft",    KerArgSpace(1,T0), O_IN|O_BUFF|O_CONST, 2*(3*Nfft/4), 		     1,       sizeof(short int),    0, 0, 0, "Twiddles_fft"),
-			KerArg("SwapTable_fft",   KerArgSpace(1,T0), O_IN|O_BUFF|O_CONST, Nfft,         		     1,       sizeof(short int),    0, 0, 0, "SwapTable_fft"),
-			KerArg("MFCC_FilterBank", KerArgSpace(1,T0), O_IN|O_BUFF|O_CONST, Ndct,         		     1,       sizeof(fbank_type_t), 0, 0, 0, "MFCC_FilterBank"),
-			KerArg("MFCC_Coeffs",     KerArgSpace(1,T0), O_IN|O_BUFF|O_CONST, NMFCCCoeff,   		     1,       sizeof(short int),    0, 0, 0, "MFCC_Coeffs"),
-			KerArg("DCT_Coeff",       KerArgSpace(1,T0), O_IN|O_BUFF|O_CONST, Ndct*Ndct,    		     1,       sizeof(short int),    0, 0, 0, "DCT_Coeff"),
-			KerArg("lift_coeff",      KerArgSpace(1,T0), O_IN|O_BUFF|O_CONST, Ndct,         		     1,       sizeof(short int),    0, 0, 0, "lift_coeff")
+		KerArgs(do_dct?14:13+high_prec_fft,
+			KerArg("In",              KerArgSpace(1,D0), OBJ_IN_DB,	  	  1, FrameSize, 	  	sizeof(short int),    FrameSize-FrameStride, 0, 0, "In"),
+			KerArg("Out",         	  KerArgSpace(1,D0), OBJ_OUT_DB,   	  1, Ndct,          	sizeof(short int),    0, 0, 0, "Out"),
+			KerArg("InOut1",          KerArgSpace(1,T0), O_BUFF,   		  1, 2*Nfft,            sizeof(int),          0, 0, 0, ""),
+			KerArg("Out_fft",         KerArgSpace(1,T0), O_BUFF,   		  1, 2*Nfft,            sizeof(int),          0, 0, 0, ""),
+			KerArg("shift_fft",       KerArgSpace(1,T0), O_BUFF,       	  1, 2*Nfft,            sizeof(signed char),  0, 0, 0, ""),
+			KerArg("InOut2",          KerArgSpace(1,T0), O_BUFF,   		  1, Ndct,	             sizeof(int),          0, 0, 0, ""),
+			KerArg("Shift",		  KerArgSpace(1,T0), O_BUFF,	          1, 1, 		     sizeof(short int),    0, 0, 0, ""),
+			KerArg("WinTable",        KerArgSpace(1,T0), O_IN|O_BUFF|O_CONST, 1, Nfft,              sizeof(short int),    0, 0, 0, "WinTable"),
+			KerArg("Twiddles_fft",    KerArgSpace(1,T0), O_IN|O_BUFF|O_CONST, 1, 2*(Nfft),	     sizeof(short int),    0, 0, 0, "Twiddles_fft"),
+			KerArg("SwapTable_fft",   KerArgSpace(1,T0), O_IN|O_BUFF|O_CONST, 1, Nfft,              sizeof(short int),    0, 0, 0, "SwapTable_fft"),
+			KerArg("MFCC_FilterBank", KerArgSpace(1,T0), O_IN|O_BUFF|O_CONST, 1, Ndct,              sizeof(fbank_type_t), 0, 0, 0, "MFCC_FilterBank"),
+			KerArg("MFCC_Coeffs",     KerArgSpace(1,T0), O_IN|O_BUFF|O_CONST, 1, NMFCCCoeff,        sizeof(short int),    0, 0, 0, "MFCC_Coeffs"),
+			KerArg("DCT_Coeff",       KerArgSpace(1,T0), O_IN|O_BUFF|O_CONST, 1, Ndct*Ndct,         sizeof(short int),    0, 0, 0, "DCT_Coeff"),
+			high_prec_fft?KerArg("shift_bf",    KerArgSpace(1,T0), O_BUFF,    1, Nfft,              sizeof(signed char),  0, 0, 0, ""):0,
+			do_lifter?KerArg("lift_coeff",      KerArgSpace(1,T0), O_IN|O_BUFF|O_CONST|O_NTILED, 1, Ndct, sizeof(short int),    0, 0, 0, "lift_coeff"):0
 		)
 	);
 }
-#endif
 
 
 void IMFCC_parallel(char *Name, int nbin, int n_fft,  int imfcc_coeff_cnt) {

@@ -81,6 +81,7 @@ void MFCC_PreEmphasis(MFCC_PreEmphasis_T *Arg)
   short int * __restrict__ Frame = Arg->Frame;
   short int * __restrict__ Out = Arg->Out;
   int FrameSize = Arg->FrameSize;
+  short int PreempFactor = Arg->PreempFactor;
   short int S;
   short int Sprev;
   
@@ -98,10 +99,9 @@ void MFCC_PreEmphasis(MFCC_PreEmphasis_T *Arg)
   int shift = *(Arg->Shift);
   S = CoreId? Frame[First-1]<<shift : Arg->Prev<<shift;
 
-  short int Fix097 = FP2FIX(0, 15); //TODO 0.97 must become a parameter
   for (int i=First; i<Last; i++) {
     Sprev = Frame[i]<<shift;
-    Out[i] = Sprev - gap_mulsRN(Fix097, S, 15);
+    Out[i] = Sprev - gap_mulsRN(PreempFactor, S, 15);
     S = Sprev;
   }
 
@@ -267,6 +267,14 @@ void MFCC_Power(MFCC_EP_T *Arg)
   #endif
 }
 
+int SQRT(int x, int Qbits){
+  int ONE = 1<<Qbits;
+  int a_over_2 = (x - ONE) >> 1;
+  int a2_over_8 = (a_over_2 * a_over_2) >> (Qbits + 2);
+  int a3_over_16 = (a2_over_8 * a_over_2) >> (Qbits);
+  return ONE + a_over_2 - a2_over_8 + a3_over_16;
+}
+
 void MFCC_Abs(MFCC_EP_T *Arg)
 {
   int *__restrict__ FrameIn     = (int *) Arg->FrameIn;
@@ -366,6 +374,7 @@ void MFCC_ComputeMFCC(MFCC_MF_T *Arg)
     if ((shift0+MEL_COEFF_DYN)>31) shift = shift0-(31-MEL_COEFF_DYN); else shift = 0;
 
     for (k=0, j=MFCC_FilterBank[i].Start; j<(unsigned int)(MFCC_FilterBank[i].Start+Count); j++, k++){
+      // very easy to overflow here - maybe decrease the coeff dyn
       Coeff = Coeff + MFCC_Coeffs[Base+k]*(FramePower[j]>>shift);
     }
     Coeff = Coeff << shift;
@@ -501,12 +510,12 @@ void MFCC_ComputeLog( MFCC_Log_T *Arg) {
 
     #ifndef USE_ABS
     #ifdef HIGH_PREC_FFT
-      frameIn[i] =  TMP - (8 - shift_BF[i] - QNN + 2*Shift) * GAPLOG2;
+      frameIn[i] =  TMP - (8 - shift_BF[i] - QNN + 2*Shift) * GAPLOG2; //POWER HIGH_PREC
     #else
-      frameIn[i] =  TMP - (2*(16-FFT_BITS+Shift)+10 - QNN) * GAPLOG2;
+      frameIn[i] =  TMP - (2*(16-FFT_BITS+Shift)+MEL_COEFF_DYN - QNN) * GAPLOG2; //POWER
     #endif
     #else
-      frameIn[i] =  TMP - ((16-FFT_BITS+Shift)+10 - QNN) * GAPLOG2;
+      frameIn[i] =  TMP - ((16-FFT_BITS+Shift)+MEL_COEFF_DYN - QNN) * GAPLOG2; //Abs
     #endif
   }
   
@@ -514,11 +523,15 @@ void MFCC_ComputeLog( MFCC_Log_T *Arg) {
 
 #ifdef PRINTDEB
   if (CoreId==0) {
-    printf("LOG\n");
-    printf("Shift = %d\n", Shift);
-    printf("offshift = %d\n", offshift);
-    printf("GAPLOG2 = %d\n", GAPLOG2);
-    printf("LOG_NORM = %d\n", LOG_NORM);
+
+    #ifdef USE_ABS
+    printf("#ABS\n");
+    #endif
+    #ifdef HIGH_PREC_FFT
+    printf("#HIGH_PREC\n");
+    #endif
+
+    printf("#Shift = %d offshift = %d GAPLOG2 %d LOG_NORM %d \n", Shift, offshift, GAPLOG2, LOG_NORM);
     printf("out_log = np.array([\n");
     for(i=0;i<size;i++) printf("%d, ", frameIn[i]);
     printf("])\n");
