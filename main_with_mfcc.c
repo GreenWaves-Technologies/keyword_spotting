@@ -24,7 +24,7 @@
 #include "LUT.def"
 #include "MFCC_FB.def"
 
-#define  WAV_BUFFER_SIZE    16000 // Something more than 1sec@16kHz
+#define  WAV_BUFFER_SIZE    16000 // 1sec@16kHz
 #define  NUM_CLASSES        12
 
 //DCT_NORMALIZATION        -> np.sqrt(1/(N_DCT))*0.5
@@ -128,7 +128,8 @@ static void RunMFCC(){
         total_cyc = 0;
         start = gap_cl_readhwtimer();
     #endif
-    MFCC(inSig+(count-1)%2*WAV_BUFFER_SIZE/2, mfcc_features, 0, TwiddlesLUT, SwapLUT, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, 5, N_DCT, DCT_Coeff);
+    // run inference on inSig[0:WAV_BUFFER_SIZE] and inSig[WAV_BUFFER_SIZE/2:WAV_BUFER_SIZE*3/2] alternately
+    MFCC(inSig+((count-1)%2)*(WAV_BUFFER_SIZE/2), mfcc_features, 0, TwiddlesLUT, SwapLUT, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, 5, N_DCT, DCT_Coeff);
     #ifdef PERF
         elapsed = gap_cl_readhwtimer() - start;
         total_cyc += elapsed;
@@ -254,8 +255,9 @@ while(1)
         #ifdef WRITE_WAV
             char FileName[100];
             sprintf(FileName, "../../../from_gap_%d_%s.wav", count, LABELS[rec_digit]);
-            WriteWavToFile(FileName, i2s_conf.word_size, i2s_conf.frame_clk_freq,
-                 i2s_conf.channels, (void *)inSig+(count-1)%2*WAV_BUFFER_SIZE/2, WAV_BUFFER_SIZE * sizeof(short int));
+            // run inference on inSig[0:WAV_BUFFER_SIZE] and inSig[WAV_BUFFER_SIZE/2:WAV_BUFER_SIZE*3/2] alternately
+            WriteWavToFile(FileName, i2s_conf.word_size, i2s_conf.frame_clk_freq, i2s_conf.channels, 
+                           (void *)inSig+((count-1)%2)*(WAV_BUFFER_SIZE/2), WAV_BUFFER_SIZE * sizeof(short int));
         #endif
     #endif
 
