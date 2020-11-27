@@ -1,10 +1,16 @@
 #include "AutoTilerLib.h"
 #include "AutoTilerLibTypes.h"
 #include "MFCC_Generator.h"
-#include "MFCC_params.h"
-
-#define RADIX2 0
-#define RADIX4 1
+#ifdef SMALL
+  #include "MFCC_params_SMALL.h"
+#endif
+#ifdef MEDIUM
+  #include "MFCC_params_MEDIUM.h"
+#endif
+#ifdef LARGE
+  #include "MFCC_params_LARGE.h"
+#endif
+  
 
 void MFCCConfiguration(unsigned int L1Memory)
 {
@@ -25,7 +31,7 @@ int main(int argc, char **argv)
     MFCCConfiguration(51200);
     // Load FIR basic kernels
     LoadMFCCLibrary();
-    MFCC2D_Generator("MFCC", 0, N_FRAME, FRAME_SIZE, FRAME_STEP, N_FFT, MFCC_COEFF_CNT, N_DCT, 0.0, 1, 0, 0);
-    MFCC2D_Generator("MFCC00", 0, 1, FRAME_SIZE, FRAME_STEP, N_FFT, MFCC_COEFF_CNT, N_DCT, 0.0, 1, 0, 0);
+    MFCC_Generator("MFCC",        0, N_FRAME, FRAME_SIZE, FRAME_STEP, N_FFT, MFCC_COEFF_CNT, N_DCT, PREEMP_FACTOR, LIFTER_COEFF, USE_RADIX_4, USE_POWER, USE_HIGH_PREC);
+    MFCC_Generator("MFCC_single", 0, 1,       FRAME_SIZE, FRAME_STEP, N_FFT, MFCC_COEFF_CNT, N_DCT, PREEMP_FACTOR, LIFTER_COEFF, USE_RADIX_4, USE_POWER, USE_HIGH_PREC);
     GenerateTilingCode();
 }

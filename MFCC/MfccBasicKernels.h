@@ -37,6 +37,14 @@ typedef struct {
 typedef struct {
   v2s *__restrict__ FrameIn;
   int *__restrict__ FrameOut;
+  signed char *__restrict__ shift_fft;
+  short int *Shift;
+  int nfft;
+} MFCC_EP_BFF_T;
+
+typedef struct {
+  v2s *__restrict__ FrameIn;
+  int *__restrict__ FrameOut;
   int nfft;
 } MFCC_Abs_T;
 
@@ -81,7 +89,8 @@ typedef struct {
   unsigned int * __restrict__ FrameIn;
   unsigned int FrameSize;
   short int *Shift;
-  short int offshift;
+  short int fft_bits;
+  short int MFCC_Coeff_dyn;
   signed char *__restrict__ shift_BF;
 } MFCC_Log_T;
 
@@ -91,6 +100,7 @@ typedef struct {
   fbank_type_t *__restrict__ MFCC_FilterBank;
   short int *__restrict__ MFCC_Coeffs;
   short int MFCC_bank_cnt;
+  short int MFCC_Coeff_dyn;
 } MFCC_MF_T;
 
 typedef struct {
@@ -104,7 +114,6 @@ typedef struct {
   void * __restrict__ Twiddles;	/**< Pointer to fft twiddles (I, Q) pairs, I and Q fixed point Q15 */
   void * __restrict__ Twidend;	/**< Pointer to fft twiddles (I, Q) pairs, I and Q fixed point Q15: DCT last stage */
   short int * __restrict__ SwapLuts;	/**< Pointer to fft twiddles (I, Q) pairs, I and Q fixed point Q15 */
-  short int * __restrict__ Lift_coeff;	/**< Pointer to lifter coefficients  */
   short int * __restrict__ FeatList;	/**< Pointer to Feature list  */
   unsigned int n_dct; /**< FFT dimension, has to be a power of 2 */
   int numcep;
@@ -113,9 +122,8 @@ typedef struct {
 typedef struct {
   void * __restrict__ Data; /**< Pointer to input data (I, Q) pairs, I and Q fixed point format */
   short int * __restrict__ DCTCoeff;  /**< Pointer to fft twiddles (I, Q) pairs, I and Q fixed point Q15 */
-  short int * __restrict__ Lift_coeff;  /**< Pointer to lifter coefficients  */
   short int * __restrict__ FeatList;  /**< Pointer to Feature list  */
-  unsigned int n_dct; /**< FFT dimension, has to be a power of 2 */
+  unsigned int n_dct; /**< DCT dimension, doesn't has to be a power of 2 */
   int numcep;
 } DCT_II_Arg_T;
 
@@ -132,17 +140,17 @@ typedef struct {
 } postproc_dct_args_T;
 
 typedef struct {
-        int *__restrict__ Frame;			/**< Pointer to input data (I, Q) pairs, I and Q fixed point format */
-        int FrameSize;					/**< Frame dimension */
-        int shift;					/**< scale dimension */
-} lifter_args_T;
+  short int *__restrict__  FeatList;			/**< Pointer to input data (I, Q) pairs, I and Q fixed point format */
+  short int * __restrict__ LiftCoeff;
+  int FrameSize;					/**< Frame dimension */
+} Lifter_Arg_T;
 
 void MFCC_PreEmphasis(MFCC_PreEmphasis_T *Arg);
 void MFCC_WindowedFrame(MFCC_WF_T *Arg);
 void MFCC_WindowedFrame_int(MFCC_WFINT_T *Arg);
 void MFCC_PowerV2S(MFCC_EP_T *Arg);
 void MFCC_Power(MFCC_EP_T *Arg);
-void MFCC_Abs_BFF(MFCC_EP_T *Arg);
+void MFCC_Abs_BFF(MFCC_EP_BFF_T *Arg);
 void MFCC_Abs(MFCC_EP_T *Arg);
 void MFCC_ComputeMFCC(MFCC_MF_T *Arg);
 void MFCC_ComputeMFCC_BFF(MFCC_MF_New_T *Arg);

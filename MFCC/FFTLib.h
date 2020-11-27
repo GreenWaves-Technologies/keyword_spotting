@@ -20,6 +20,8 @@ void SetupTwiddlesLUT_f16(float16 *Twiddles, float *Twiddlesf, int N);
 void Dmp_twid(float16 *Twid, int N, int size);
 #endif
 
+char *__FP(int X, int Precision, char *Out);
+
 typedef struct {
   float r;
   float i;

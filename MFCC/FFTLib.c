@@ -14,7 +14,6 @@
 
 #include "Gap.h"
 #include "FFTLib.h"
-#include "FP_Lib.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -585,7 +584,7 @@ static void Radix4FFTKernel_Twiddle0(v2s *InOutA, v2s *InOutB, v2s *InOutC, v2s 
    *InOutD = ((A - C) - gap8_sub2rotmj(B,  D));
    */
 
-  if (!Inverse) {
+  if (Inverse) {
     *InOutA = ((A + C) +	           (B + D));
     *InOutD = ((A - C) - gap_sub2rotmj(B,  D));
     *InOutB = ((A + C) -	           (B + D));
@@ -682,18 +681,14 @@ void SwapSamples_scal( SwapSamples_scal_Arg_T *Arg)
 
   #ifdef PRINTDEB
     if (CoreId==0) {
-      printf("\n\n############# SWAP FFT #############\n");
-      printf("\n\nout_fft_swapped_c = np.array([ \n\t");
+      printf("\nout_fft_swapped_c = np.array([ \n\t");
       for (int j=0; j<Ni; j++) {
         if (Datav[j][1]<0) printf("%d%dj, ",  Datav[j][0], Datav[j][1]);
         else               printf("%d+%dj, ", Datav[j][0], Datav[j][1]);
       }
-      printf("\n])\n");
-      printf("\n\nout_fft_shift_swapped_c = np.array([ \n\t");
-      for (int j=0; j<Ni; j++) {
-        printf("%d, ", scale[j]);
-      }
-      printf("\n])\n");
+      printf("])\nout_fft_shift_swapped_c = np.array([ \n\t");
+      for (int j=0; j<Ni; j++) printf("%d, ", scale[j]);
+      printf("])\n");
     }
     gap_waitbarrier(0);
   #endif
@@ -726,14 +721,12 @@ void SwapSamples_Par(SwapSamples_Arg_T *Arg)
 
     #ifdef PRINTDEB
       if (CoreId==0){
-        printf("\n\n############# Swapped #############n\n");
-        printf("out_swapped_fft = np.array([\n\t");
+        printf("\nout_swapped_fft = np.array([\n\t");
         for (int j=0; j<Ni; j++) {
-	      //if (!(j%2)) printf("\n%d ",j);
           if (Data[j][1]<0) printf("%d%dj, ",  Data[j][0], Data[j][1]);
           else              printf("%d+%dj, ", Data[j][0], Data[j][1]);
         }
-        printf("])\n\n");
+        printf("])\n");
       }
     #endif
   }
