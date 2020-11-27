@@ -6,12 +6,12 @@
 
 DUMP_TENSORS ?= 1
 WITH_MFCC ?= 1
+USE_POWER ?= 1
 SMALL  ?= 0
 MEDIUM ?= 0
 LARGE  ?= 0
 ifeq ($(SMALL), 1)
 	MODEL_PREFIX = KWS_ds_cnn_s_quant
-	TRAINED_TFLITE_MODEL=model/$(MODEL_PREFIX)_power.tflite
 	DCT_COUNT = 10
 	FRAME_SIZE_ms = 40
 	FRAME_STEP_ms = 20
@@ -21,7 +21,6 @@ ifeq ($(SMALL), 1)
 else
 	ifeq ($(MEDIUM), 1)
 		MODEL_PREFIX = KWS_ds_cnn_m_quant
-		TRAINED_TFLITE_MODEL=model/$(MODEL_PREFIX)_power.tflite
 		DCT_COUNT = 10
 		FRAME_SIZE_ms = 40
 		FRAME_STEP_ms = 20
@@ -31,7 +30,6 @@ else
 	else
 		ifeq ($(LARGE), 1)
 			MODEL_PREFIX = KWS_ds_cnn_l_quant
-			TRAINED_TFLITE_MODEL=model/$(MODEL_PREFIX)_power.tflite
 			DCT_COUNT = 40
 			FRAME_SIZE_ms = 30
 			FRAME_STEP_ms = 10
@@ -68,6 +66,10 @@ MODEL_SIZE_CFLAGS = -DAT_INPUT_HEIGHT=$(AT_INPUT_HEIGHT) -DAT_INPUT_WIDTH=$(AT_I
 
 include common/model_decl.mk
 include mfcc_model.mk
+ifeq ($(USE_POWER), 1)
+	# override the tflite model name to the one which expects power MFCC -> more efficient
+	TRAINED_TFLITE_MODEL=model/$(MODEL_PREFIX)_power.tflite
+endif
 
 MODEL_GEN_EXTRA_FLAGS= -f $(MODEL_BUILD)
 CC = gcc

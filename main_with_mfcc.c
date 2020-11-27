@@ -10,16 +10,18 @@
 /* Autotiler includes. */
 #include "Gap.h"
 #ifdef SMALL
-	#include "KWS_ds_cnn_s_quantKernels.h"
+    #include "KWS_ds_cnn_s_quantKernels.h"
+    #include "MFCC_params_SMALL.h"
 #endif
 #ifdef MEDIUM
     #include "KWS_ds_cnn_m_quantKernels.h"
+    #include "MFCC_params_MEDIUM.h"
 #endif
 #ifdef LARGE
-	#include "KWS_ds_cnn_l_quantKernels.h"
+    #include "KWS_ds_cnn_l_quantKernels.h"
+    #include "MFCC_params_LARGE.h"
 #endif
 #include "wavIO.h"
-#include "MFCC_params.h"
 #include "MFCCKernels.h"
 #include "LUT.def"
 #include "MFCC_FB.def"
@@ -38,7 +40,7 @@
 #define ITER    64
 
 static char *LABELS[NUM_CLASSES] = {"silence", "unknown", "yes", "no", "up", "down", "left", "right", "on", "off", "stop", "go"};
-L2_MEM short int *ResOut;
+L2_MEM unsigned short int *ResOut;
 char *WavName = NULL;
 char *ImageIn;
 int off_shift = 0;
@@ -119,7 +121,7 @@ int rec_digit;
 #endif
 
 static void RunMFCC(){
-    L1_Memory = KWS_ds_cnn_m_quant_L1_Memory;
+    L1_Memory = __PREFIX(_L1_Memory);
     PRINTF("Runnning MFCC\n");
     #ifdef PERF
         gap_cl_starttimer();
@@ -129,7 +131,7 @@ static void RunMFCC(){
         start = gap_cl_readhwtimer();
     #endif
     // run inference on inSig[0:WAV_BUFFER_SIZE] and inSig[WAV_BUFFER_SIZE/2:WAV_BUFER_SIZE*3/2] alternately
-    MFCC(inSig+((count-1)%2)*(WAV_BUFFER_SIZE/2), mfcc_features, 0, TwiddlesLUT, SwapLUT, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, 5, N_DCT, DCT_Coeff);
+    MFCC(inSig+((count-1)%2)*(WAV_BUFFER_SIZE/2), mfcc_features, 0, TwiddlesLUT, SwapLUT, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, 5, DCT_Coeff);
     #ifdef PERF
         elapsed = gap_cl_readhwtimer() - start;
         total_cyc += elapsed;
@@ -144,7 +146,7 @@ static void Runkws()
   gap_cl_starttimer();
   gap_cl_resethwtimer();
 #endif
-  __PREFIX(CNN)(ImageIn, ResOut);
+  __PREFIX(CNN)(ImageIn, (short int *) ResOut);
 
   //Checki Results
   rec_digit = 0;
@@ -165,6 +167,15 @@ static void Runkws()
 
 void kws_ds_cnn(void)
 {
+    // Voltage-Frequency settings
+    uint32_t voltage =1200;
+    pi_freq_set(PI_FREQ_DOMAIN_FC, FREQ_FC*1000*1000);
+    pi_freq_set(PI_FREQ_DOMAIN_CL, FREQ_CL*1000*1000);
+    //PMU_set_voltage(voltage, 0);
+    printf("Set VDD voltage as %.2f, FC Frequency as %d MHz, CL Frequency = %d MHz\n", 
+        (float)voltage/1000, FREQ_FC, FREQ_CL);
+    pulp_write32(0x1A10414C,1);
+
     printf("Entering main controller\n");
     /* Configure And open cluster. */
     struct pi_device cluster_dev;
@@ -177,7 +188,7 @@ void kws_ds_cnn(void)
         pmsis_exit(-4);
     }
     
-    ResOut        = (short int *) pi_l2_malloc(NUM_CLASSES                      * sizeof(short int));
+    ResOut        = (unsigned short int *) pi_l2_malloc(NUM_CLASSES             * sizeof(short int));
     ImageIn       = (char *)      pi_l2_malloc(AT_INPUT_WIDTH * AT_INPUT_HEIGHT * sizeof(char));
     mfcc_features = (short int *) pi_l2_malloc(N_FRAME * N_DCT                  * sizeof(short int));
     inSig         = (short int *) pi_l2_malloc(NB_ELEM * (ITER + ITER/2)        * sizeof(short int));
@@ -270,7 +281,7 @@ while(1)
 
     for (int i=0; i<N_FRAME; i++) {
         // Take only the first N_CEP that you need (in this case 10)
-        for (int j=0; j<10; j++) {
+        for (int j=0; j<AT_INPUT_WIDTH; j++) {
             ImageIn[i*AT_INPUT_WIDTH+j] = (char) gap_roundnorm(mfcc_features[i*N_DCT+j]*INPUT_SCALE, INPUT_SCALEN);
         }
     }

@@ -18,19 +18,21 @@
 #include "Gap.h"
 #ifdef SMALL
 	#include "KWS_ds_cnn_s_quantKernels.h"
+    #include "MFCC_params_SMALL.h"
 #endif
 #ifdef MEDIUM
     #include "KWS_ds_cnn_m_quantKernels.h"
+    #include "MFCC_params_MEDIUM.h"
 #endif
 #ifdef LARGE
 	#include "KWS_ds_cnn_l_quantKernels.h"
+    #include "MFCC_params_LARGE.h"
 #endif
 #ifdef WITH_MFCC
     #include "wavIO.h"
 #else
     #include "gaplib/ImgIO.h"
 #endif
-#include "MFCC_params.h"
 #include "MFCCKernels.h"
 #include "LUT.def"
 #include "MFCC_FB.def"
@@ -46,7 +48,7 @@
 
 
 static char *LABELS[NUM_CLASSES] = {"silence", "unknown", "yes", "no", "up", "down", "left", "right", "on", "off", "stop", "go"};
-L2_MEM short int *ResOut;
+L2_MEM unsigned short int *ResOut;
 char *WavName = NULL;
 char *ImageName = NULL;
 char *ImageIn;
@@ -59,15 +61,15 @@ int rec_digit;
 
 
 static void RunMFCC(){
-    L1_Memory = KWS_ds_cnn_m_quant_L1_Memory;
+    L1_Memory = __PREFIX(_L1_Memory);
     PRINTF("Runnning MFCC\n");
-    MFCC(inSig, mfcc_features, 0, TwiddlesLUT, SwapLUT, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, 5, N_DCT, DCT_Coeff);
+    MFCC(inSig, mfcc_features, 0, TwiddlesLUT, SwapLUT, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, 5, DCT_Coeff);
 }
 
 static void Runkws()
 {
   PRINTF("Running on cluster\n");
-  __PREFIX(CNN)(ImageIn, ResOut);
+  __PREFIX(CNN)(ImageIn, (short int *) ResOut);
 
   //Checki Results
   rec_digit = 0;
@@ -80,14 +82,14 @@ static void Runkws()
     }
     PRINTF("class %d: %d\n", i, ResOut[i]);
   }
-  printf("Recognized:\t%s\n", LABELS[rec_digit]);
+  printf("Recognized:\t%d\n", rec_digit);
 }
 
 
 void kws_ds_cnn(void)
 {
     printf("Entering main controller\n");
-    ResOut        = (short int *) pi_l2_malloc(NUM_CLASSES                      * sizeof(short int));
+    ResOut        = (unsigned short int *) pi_l2_malloc(NUM_CLASSES             * sizeof(short int));
     ImageIn       = (char *)      pi_l2_malloc(AT_INPUT_WIDTH * AT_INPUT_HEIGHT * sizeof(char));
     mfcc_features = (short int *) pi_l2_malloc(N_FRAME * N_DCT                  * sizeof(short int));
     inSig         = (short int *) pi_l2_malloc(WAV_BUFFER_SIZE                  * sizeof(short int));

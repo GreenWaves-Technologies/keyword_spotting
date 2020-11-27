@@ -9,6 +9,7 @@ ifndef GAP_SDK_HOME
 endif
 
 WITH_MFCC ?= 1
+USE_POWER ?= 1
 SMALL  ?= 0
 MEDIUM ?= 0
 LARGE  ?= 0
@@ -23,7 +24,6 @@ ifeq ($(SMALL), 1)
 else
 	ifeq ($(MEDIUM), 1)
 		MODEL_PREFIX = KWS_ds_cnn_m_quant
-		TRAINED_TFLITE_MODEL=model/$(MODEL_PREFIX)_new.tflite
 		DCT_COUNT = 10
 		FRAME_SIZE_ms = 40
 		FRAME_STEP_ms = 20
@@ -68,8 +68,19 @@ MODEL_L1_MEMORY=$(shell expr 60000 \- $(TOTAL_STACK_SIZE))
 MODEL_L2_MEMORY=350000
 MODEL_L3_MEMORY=8000000
 MODEL_SIZE_CFLAGS = -DAT_INPUT_HEIGHT=$(AT_INPUT_HEIGHT) -DAT_INPUT_WIDTH=$(AT_INPUT_WIDTH) -DAT_INPUT_COLORS=$(AT_INPUT_COLORS)
+ifeq '$(TARGET_CHIP)' 'GAP8_V3'
+	FREQ_CL?=175
+else
+	FREQ_CL?=50
+endif
+FREQ_FC?=250
 
 include common/model_decl.mk
+ifeq ($(USE_POWER), 1)
+	# override the tflite model name to the one which expects power MFCC -> more efficient
+	TRAINED_TFLITE_MODEL=model/$(MODEL_PREFIX)_power.tflite
+endif
+
 
 ifeq ($(WITH_MFCC), 1)
 	APP_SRCS    += main_with_mfcc.c $(MODEL_GEN_C) $(MODEL_COMMON_SRCS) $(CNN_LIB)
@@ -83,7 +94,7 @@ APP_CFLAGS += -O3 -s -mno-memcpy -fno-tree-loop-distribute-patterns
 APP_CFLAGS += -I. -I$(MODEL_COMMON_INC) -I$(TILER_EMU_INC) -I$(TILER_INC) -I$(MODEL_BUILD) $(CNN_LIB_INCLUDE)
 APP_CFLAGS += -Icommon -I$(MFCC_DIR) -I$(MFCCBUILD_DIR) -I$(LUT_GEN_DIR)
 APP_CFLAGS += -DAT_MODEL_PREFIX=$(MODEL_PREFIX) $(MODEL_SIZE_CFLAGS)
-APP_CFLAGS += -DSTACK_SIZE=$(CLUSTER_STACK_SIZE) -DSLAVE_STACK_SIZE=$(CLUSTER_SLAVE_STACK_SIZE)
+APP_CFLAGS += -DSTACK_SIZE=$(CLUSTER_STACK_SIZE) -DSLAVE_STACK_SIZE=$(CLUSTER_SLAVE_STACK_SIZE) -DFREQ_FC=$(FREQ_FC) -DFREQ_CL=$(FREQ_CL)
 APP_CFLAGS += -DAT_IMAGE=$(IMAGE) -DAT_WAV=$(WAV_PATH)  -DFROM_SENSOR -DSILENT #-DWRITE_WAV #-DPRINT_AT_INPUT #-DPRINT_WAV 
 LIBS = -lm
 
@@ -97,9 +108,9 @@ test_accuracy_tflite:
 	python utils/test_accuracy_tflite.py --tflite_model $(TRAINED_TFLITE_MODEL) --dct_coefficient_count $(DCT_COUNT) --window_size_ms $(FRAME_SIZE_ms) --window_stride_ms $(FRAME_STEP_ms)
 
 # all depends on the model
-all:: model mfcc_model #generate_samples
+all:: model mfcc_model generate_samples
 
-clean:: #clean_at_model clean_mfcc_model
+clean:: clean_at_model clean_mfcc_model
 
 clean_at_model:
 	$(RM) $(MODEL_GEN_EXE)

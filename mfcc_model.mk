@@ -1,9 +1,9 @@
 # User Test
 #------------------------------------------
-MFCC_DIR ?= $(CURDIR)/MFCC_GENERATORS
+MFCC_DIR ?= $(CURDIR)/MFCC
 MFCCBUILD_DIR ?= $(CURDIR)/BUILD_MFCC_MODEL
 MFCC_MODEL_GEN = $(MFCCBUILD_DIR)/GenMFCC
-LUT_GEN_DIR = $(MFCC_DIR)/lut_generators
+LUT_GEN_DIR = $(MFCC_DIR)
 MFCC_SRCG += $(MFCC_DIR)/MFCC_Generator.c
 
 # Everything bellow is not application specific
@@ -25,12 +25,15 @@ MEDIUM ?= 0
 LARGE  ?= 0
 ifeq ($(SMALL), 1)
 SIZE_DEF += -DSMALL
+NN_SIZE = SMALL
 else
 ifeq ($(MEDIUM), 1)
 SIZE_DEF += -DMEDIUM
+NN_SIZE = MEDIUM
 else
 ifeq ($(LARGE), 1)
 SIZE_DEF += -DLARGE
+NN_SIZE = LARGE
 else
 $(error You must set to 1 one of SMALL, MEDIUM, LARGE to select a network)
 endif
@@ -46,7 +49,7 @@ $(MFCC_MODEL_GEN): $(MFCCBUILD_DIR)
 			  $(MFCC_DIR)/MFCCmodel.c $(MFCC_SRCG) $(TILER_LIB)  $(TABLE_CFLAGS) #$(SDL_FLAGS)
 
 gen_lut:
-	python $(LUT_GEN_DIR)/gen_lut.py
+	python $(LUT_GEN_DIR)/gen_lut.py $(NN_SIZE)
 
 # Run the code generator  kernel code
 mfcc_model: $(MFCC_MODEL_GEN) gen_lut
