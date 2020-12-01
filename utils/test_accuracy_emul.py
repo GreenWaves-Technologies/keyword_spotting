@@ -15,7 +15,8 @@ import input_data
 
 def prepare_model_settings(label_count, sample_rate, clip_duration_ms,
                            window_size_ms, window_stride_ms,
-                           dct_coefficient_count, preprocess='mfcc'):
+                           dct_coefficient_count, preprocess='mfcc',
+                           use_power_spectrogram=True):
   """Calculates common settings needed for all models.
 
   Args:
@@ -67,6 +68,7 @@ def prepare_model_settings(label_count, sample_rate, clip_duration_ms,
       'sample_rate': sample_rate,
       'preprocess': preprocess,
       'average_window_width': average_window_width,
+      'use_power': use_power_spectrogram
   }
 
 
@@ -79,7 +81,7 @@ def main(_):
     large = int("_l_" in FLAGS.tflite_model)
     if not small and not medium and not large:
       raise ValueError("You must select one of the models in model dir")
-    compile_command = 'make -f emul.mk clean_model clean all DUMP_TENSORS=0 SMALL={} MEDIUM={} LARGE={} WITH_MFCC={}'.format(small, medium, large, 1 if FLAGS.test_with_wav == True else 0)
+    compile_command = 'make -f emul.mk clean_model clean all DUMP_TENSORS=0 SMALL={} MEDIUM={} LARGE={} WITH_MFCC={} USE_POWER={}'.format(small, medium, large, 1 if FLAGS.test_with_wav == True else 0, 1 if FLAGS.use_power_spectrogram == True else 0)
     print(compile_command)
     stream = os.popen(compile_command)
     for line in stream.readlines():
@@ -95,7 +97,7 @@ def main(_):
   words_list = input_data.prepare_words_list(FLAGS.wanted_words.split(','))
   model_settings = prepare_model_settings(
       len(words_list), FLAGS.sample_rate, FLAGS.clip_duration_ms, FLAGS.window_size_ms,
-      FLAGS.window_stride_ms, FLAGS.dct_coefficient_count, FLAGS.preprocess)
+      FLAGS.window_stride_ms, FLAGS.dct_coefficient_count, FLAGS.preprocess, bool(FLAGS.use_power_spectrogram))
   print(model_settings)
  
   audio_processor = input_data.AudioProcessor(
@@ -297,6 +299,10 @@ if __name__ == '__main__':
       type=int,
       default=0,
       help='Test with MFCC gap implementation')
+  parser.add_argument(
+      '--use_power_spectrogram',
+      type=int,
+      default=1)
 
   
   FLAGS, unparsed = parser.parse_known_args()

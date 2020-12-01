@@ -37,7 +37,7 @@
 		"N_DCT": 40,
 		"DO_DCT": 1,
 		"USE_RADIX_4": 0,
-		"USE_HIGH_PREC": 0,
+		"USE_HIGH_PREC": 1,
 		"USE_POWER": 1,
 		"LIFTER_COEFF": 0
 	},

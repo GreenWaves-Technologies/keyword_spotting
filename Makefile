@@ -10,6 +10,7 @@ endif
 
 WITH_MFCC ?= 1
 USE_POWER ?= 1
+USE_HIGH_PREC ?= 0
 SMALL  ?= 0
 MEDIUM ?= 0
 LARGE  ?= 0
@@ -89,28 +90,39 @@ ifeq ($(WITH_MFCC), 1)
 else
 	APP_SRCS    += main.c $(MODEL_GEN_C) $(MODEL_COMMON_SRCS) $(CNN_LIB)
 endif
+ifeq ($(USE_POWER), 0)
+	APP_CFLAGS += -DUSE_ABS
+endif
+ifeq ($(USE_HIGH_PREC), 1)
+	APP_CFLAGS += -DHIGH_PREC_FFT
+endif
 
 APP_CFLAGS += -O3 -s -mno-memcpy -fno-tree-loop-distribute-patterns 
 APP_CFLAGS += -I. -I$(MODEL_COMMON_INC) -I$(TILER_EMU_INC) -I$(TILER_INC) -I$(MODEL_BUILD) $(CNN_LIB_INCLUDE)
 APP_CFLAGS += -Icommon -I$(MFCC_DIR) -I$(MFCCBUILD_DIR) -I$(LUT_GEN_DIR)
 APP_CFLAGS += -DAT_MODEL_PREFIX=$(MODEL_PREFIX) $(MODEL_SIZE_CFLAGS)
 APP_CFLAGS += -DSTACK_SIZE=$(CLUSTER_STACK_SIZE) -DSLAVE_STACK_SIZE=$(CLUSTER_SLAVE_STACK_SIZE) -DFREQ_FC=$(FREQ_FC) -DFREQ_CL=$(FREQ_CL)
-APP_CFLAGS += -DAT_IMAGE=$(IMAGE) -DAT_WAV=$(WAV_PATH)  -DFROM_SENSOR -DSILENT #-DWRITE_WAV #-DPRINT_AT_INPUT #-DPRINT_WAV 
+APP_CFLAGS += -DAT_IMAGE=$(IMAGE) -DAT_WAV=$(WAV_PATH)  -DSILENT #-DWRITE_WAV #-DPRINT_AT_INPUT #-DPRINT_WAV 
+ifeq ($(platform), gvsoc)
+	APP_CFLAGS += -DPERF
+else
+	APP_CFLAGS += -DFROM_SENSOR 
+endif
 LIBS = -lm
 
 generate_samples:
 	python utils/generate_samples_images.py --dct_coefficient_count $(DCT_COUNT) --window_size_ms $(FRAME_SIZE_ms) --window_stride_ms $(FRAME_STEP_ms)
 
 test_accuracy:
-	python utils/test_accuracy_emul.py --tflite_model $(TRAINED_TFLITE_MODEL) --dct_coefficient_count $(DCT_COUNT) --window_size_ms $(FRAME_SIZE_ms) --window_stride_ms $(FRAME_STEP_ms) --test_with_wav $(WITH_MFCC)
+	python utils/test_accuracy_emul.py --tflite_model $(TRAINED_TFLITE_MODEL) --dct_coefficient_count $(DCT_COUNT) --window_size_ms $(FRAME_SIZE_ms) --window_stride_ms $(FRAME_STEP_ms) --test_with_wav $(WITH_MFCC) --use_power_spectrogram $(USE_POWER)
 
 test_accuracy_tflite:
-	python utils/test_accuracy_tflite.py --tflite_model $(TRAINED_TFLITE_MODEL) --dct_coefficient_count $(DCT_COUNT) --window_size_ms $(FRAME_SIZE_ms) --window_stride_ms $(FRAME_STEP_ms)
+	python utils/test_accuracy_tflite.py --tflite_model $(TRAINED_TFLITE_MODEL) --dct_coefficient_count $(DCT_COUNT) --window_size_ms $(FRAME_SIZE_ms) --window_stride_ms $(FRAME_STEP_ms) --use_power_spectrogram $(USE_POWER)
 
 # all depends on the model
-all:: model mfcc_model generate_samples
+all:: model mfcc_model
 
-clean:: clean_at_model clean_mfcc_model
+clean:: #clean_at_model clean_mfcc_model
 
 clean_at_model:
 	$(RM) $(MODEL_GEN_EXE)

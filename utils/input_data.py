@@ -412,7 +412,7 @@ class AudioProcessor(object):
         stride=model_settings['window_stride_samples'],
         magnitude_squared=True)
 
-    if USE_POWER:
+    if model_settings['use_power']:
       # Warp the linear scale spectrograms into the mel-scale.
       num_spectrogram_bins = spectrograms_power.shape[-1].value
       lower_edge_hertz, upper_edge_hertz, num_mel_bins = 20.0, 4000.0, 40

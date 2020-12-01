@@ -45,8 +45,7 @@ $(MFCCBUILD_DIR):
 
 # Build the code generator from the model code
 $(MFCC_MODEL_GEN): $(MFCCBUILD_DIR)
-	gcc -g -o $(MFCC_MODEL_GEN) -I$(MFCC_DIR) -I$(TILER_INC) -I$(TILER_EMU_INC) $(SIZE_DEF) \
-			  $(MFCC_DIR)/MFCCmodel.c $(MFCC_SRCG) $(TILER_LIB)  $(TABLE_CFLAGS) #$(SDL_FLAGS)
+	gcc -g -o $(MFCC_MODEL_GEN) -I$(MFCC_DIR) -I$(TILER_INC) -I$(TILER_EMU_INC) $(SIZE_DEF) $(MFCC_DIR)/MFCCmodel.c $(MFCC_SRCG) $(TILER_LIB)  $(TABLE_CFLAGS) #$(SDL_FLAGS)
 
 gen_lut:
 	python $(LUT_GEN_DIR)/gen_lut.py $(NN_SIZE)

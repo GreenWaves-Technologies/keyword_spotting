@@ -50,7 +50,7 @@ else:
 		 wav_decoder.sample_rate,
 		 dct_coefficient_count=NUM_CEP)
 
-
+print(tf.Session().run(wav_decoder.audio).max())
 mfccs = tf.Session().run(mfccs)
 interpreter = tf.lite.Interpreter(model_path)
 interpreter.allocate_tensors()

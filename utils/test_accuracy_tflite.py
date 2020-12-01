@@ -65,6 +65,7 @@ def prepare_model_settings(label_count, sample_rate, clip_duration_ms,
       'sample_rate': sample_rate,
       'preprocess': preprocess,
       'average_window_width': average_window_width,
+      'use_power': use_power_spectrogram
   }
 
 def main(_):
@@ -74,7 +75,7 @@ def main(_):
   words_list = input_data.prepare_words_list(FLAGS.wanted_words.split(','))
   model_settings = prepare_model_settings(
       len(words_list), FLAGS.sample_rate, FLAGS.clip_duration_ms, FLAGS.window_size_ms,
-      FLAGS.window_stride_ms, FLAGS.dct_coefficient_count, FLAGS.preprocess)
+      FLAGS.window_stride_ms, FLAGS.dct_coefficient_count, FLAGS.preprocess, bool(FLAGS.use_power_spectrogram))
   print(model_settings)
  
   audio_processor = input_data.AudioProcessor(
@@ -233,6 +234,10 @@ if __name__ == '__main__':
       type=str,
       default='mfcc',
       help='Spectrogram processing mode. Can be "mfcc", "average", or "micro"')
+  parser.add_argument(
+      '--use_power_spectrogram',
+      type=int,
+      default=1)
 
   
   FLAGS, unparsed = parser.parse_known_args()

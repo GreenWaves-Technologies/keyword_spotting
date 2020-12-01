@@ -35,9 +35,9 @@
 #define  INPUT_SCALE        236
 #define  INPUT_SCALEN       16
 
-#define NB_ELEM 256
+#define NB_ELEM 8000
 #define BUFF_SIZE (NB_ELEM*2)
-#define ITER    64
+#define ITER    2
 
 static char *LABELS[NUM_CLASSES] = {"silence", "unknown", "yes", "no", "up", "down", "left", "right", "on", "off", "stop", "go"};
 L2_MEM unsigned short int *ResOut;
@@ -51,6 +51,7 @@ short int *mfcc_features;
 short int *inSig;
 int count, idx, end1, end2;
 int rec_digit;
+int prev = 0;
 
 
 #ifdef FROM_SENSOR
@@ -59,15 +60,15 @@ int rec_digit;
     static int end = 0;
     static pi_task_t task;
     static short *chunk;
-    #define LENGTH_AV 16
-    #define SHL 5
+    #define LENGTH_AV 32
+    #define SHL 6
     static int av[4][LENGTH_AV] ;
     static int idx_av=0;
     static int av_00=0,av_01=0,av_02=0,av_03=0;
 
-    static void copy_data(uint8_t *dst, uint8_t *src, uint size)
+    static void copy_data(uint16_t *dst, uint16_t *src, uint size)
     {
-      memcpy(dst, src, size);
+      for (int i=0; i<size; i++) dst[i] = src[i];
     }
     // dump one mono channel chunk (NB_ELEM/2 16bits samples) from the i2s0 interface in dump_buff:
     static void my_copy_data(uint16_t *dst, uint16_t *src, uint size)
@@ -82,7 +83,7 @@ int rec_digit;
       }
 
       // assume 256 samples in the buffer
-      av_0 >>= 8;
+      av_0 /= size;
       
       av_00 -= av[0][idx_av];
       av_00 += av_0;
@@ -93,7 +94,7 @@ int rec_digit;
       // offset correction (length of buff of avg values is 16)
       for(i = 0; i < size; i++)
         {
-          dst[i] -= (av_00>>4) ;
+          dst[i] -= (av_00>>5) ;
         }
 
     }
@@ -105,16 +106,15 @@ int rec_digit;
         unsigned int size;
 
         pi_i2s_read_status(&task, (void **)&chunk, &size);
-        my_copy_data((uint16_t *)(inSig + idx * NB_ELEM), (uint16_t *) chunk, NB_ELEM);
+        copy_data(   (uint16_t *)(inSig + NB_ELEM), (uint16_t *) inSig, NB_ELEM);
+        my_copy_data((uint16_t *)(inSig), (uint16_t *) chunk, NB_ELEM);
         idx++;
 
-        if (idx < (ITER+ITER/2)){
-          pi_i2s_read_async(&i2s, pi_task_callback(&task, end_of_capture, NULL)); 
-          if (idx == ITER) end1 = 1;
+        if (idx < 2){
+          pi_i2s_read_async(&i2s, pi_task_callback(&task, end_of_capture, NULL));
         }
         else {
-          end2 = 1;
-          idx = 0;
+          end1 = 1;
         }
 
     }
@@ -131,7 +131,7 @@ static void RunMFCC(){
         start = gap_cl_readhwtimer();
     #endif
     // run inference on inSig[0:WAV_BUFFER_SIZE] and inSig[WAV_BUFFER_SIZE/2:WAV_BUFER_SIZE*3/2] alternately
-    MFCC(inSig+((count-1)%2)*(WAV_BUFFER_SIZE/2), mfcc_features, 0, TwiddlesLUT, SwapLUT, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, 5, DCT_Coeff);
+    MFCC(inSig, mfcc_features, 0, TwiddlesLUT, SwapLUT, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, 5, DCT_Coeff);
     #ifdef PERF
         elapsed = gap_cl_readhwtimer() - start;
         total_cyc += elapsed;
@@ -159,9 +159,11 @@ static void Runkws()
     }
     PRINTF("class %d: %d\n", i, ResOut[i]);
   }
-  if (highest < 7000) rec_digit = 1;
+  if (highest<20000 && rec_digit!=0) rec_digit = 1;
+  if (prev!=1 && rec_digit!=prev) rec_digit = 1;
+  prev = rec_digit;
 
-  printf("Recognized:\t%s\n", LABELS[rec_digit]);
+  printf("Recognized: %s\twith confidence: %d\n", LABELS[rec_digit], highest);
 }
 
 
@@ -214,6 +216,7 @@ void kws_ds_cnn(void)
 
         // Configure first interface for PDM 44100KHz DDR
         // Also gives the 2 buffers for double-buffering the sampling
+        i2s_conf.options = PI_I2S_OPT_EXT_CLK | PI_I2S_OPT_EXT_WS;
         i2s_conf.pingpong_buffers[0] = buff[0];
         i2s_conf.pingpong_buffers[1] = buff[1];
         i2s_conf.block_size = NB_ELEM*sizeof(short);
@@ -255,7 +258,7 @@ while(1)
         // containing samples.
         pi_i2s_read_async(&i2s, pi_task_callback(&task, end_of_capture, NULL));
         // Wait until acquisition is finished
-        while(end1==0 && end2==0)
+        while(idx<2 || (end1==0 && end2==0))
           {
             pi_yield();
           }
@@ -268,7 +271,7 @@ while(1)
             sprintf(FileName, "../../../from_gap_%d_%s.wav", count, LABELS[rec_digit]);
             // run inference on inSig[0:WAV_BUFFER_SIZE] and inSig[WAV_BUFFER_SIZE/2:WAV_BUFER_SIZE*3/2] alternately
             WriteWavToFile(FileName, i2s_conf.word_size, i2s_conf.frame_clk_freq, i2s_conf.channels, 
-                           (void *)inSig+((count-1)%2)*(WAV_BUFFER_SIZE/2), WAV_BUFFER_SIZE * sizeof(short int));
+                           (void *)inSig, WAV_BUFFER_SIZE * sizeof(short int));
         #endif
     #endif
 

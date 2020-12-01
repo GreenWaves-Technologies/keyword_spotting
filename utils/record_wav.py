@@ -1,5 +1,5 @@
 import sounddevice as sd
-from scipy.io.wavfile import write
+from scipy.io.wavfile import write, read
 import os
 import sys
 
@@ -10,4 +10,5 @@ myrecording = sd.rec(int(seconds * fs), samplerate=fs, channels=1, dtype='int16'
 print("Starting: Speak now!")
 sd.wait()  # Wait until recording is finished
 print("finished")
-write('samples/from_pc.wav', fs, myrecording)  # Save as WAV file
+print(myrecording)
+write('from_pc/from_pc.wav', fs, myrecording)  # Save as WAV file
