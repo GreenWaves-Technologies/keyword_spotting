@@ -4,6 +4,7 @@ MFCC_DIR ?= $(CURDIR)/MFCC
 MFCCBUILD_DIR ?= $(CURDIR)/BUILD_MFCC_MODEL
 MFCC_MODEL_GEN = $(MFCCBUILD_DIR)/GenMFCC
 LUT_GEN_DIR = $(MFCC_DIR)
+LUTS = $(LUT_GEN_DIR)/MFCC_FB.def $(LUT_GEN_DIR)/LUT.def
 MFCC_SRCG += $(MFCC_DIR)/MFCC_Generator.c
 
 # Everything bellow is not application specific
@@ -47,11 +48,11 @@ $(MFCCBUILD_DIR):
 $(MFCC_MODEL_GEN): $(MFCCBUILD_DIR)
 	gcc -g -o $(MFCC_MODEL_GEN) -I$(MFCC_DIR) -I$(TILER_INC) -I$(TILER_EMU_INC) $(SIZE_DEF) $(MFCC_DIR)/MFCCmodel.c $(MFCC_SRCG) $(TILER_LIB)  $(TABLE_CFLAGS) #$(SDL_FLAGS)
 
-gen_lut:
+$(LUTS):
 	python $(LUT_GEN_DIR)/gen_lut.py $(NN_SIZE)
 
 # Run the code generator  kernel code
-mfcc_model: $(MFCC_MODEL_GEN) gen_lut
+mfcc_model: $(MFCC_MODEL_GEN) $(LUTS)
 	$(MFCC_MODEL_GEN) -o $(MFCCBUILD_DIR) -c $(MFCCBUILD_DIR) $(MODEL_GEN_EXTRA_FLAGS)
 
 clean_mfcc_model:

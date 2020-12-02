@@ -14,6 +14,6 @@
 #define	N_DCT           	40
 #define	DO_DCT          	1
 #define	USE_RADIX_4     	0
-#define	USE_HIGH_PREC   	0
+#define	USE_HIGH_PREC   	1
 #define	USE_POWER       	1
 #define	LIFTER_COEFF    	0

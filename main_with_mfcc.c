@@ -61,7 +61,7 @@ int prev = 0;
     static pi_task_t task;
     static short *chunk;
     #define LENGTH_AV 32
-    #define SHL 6
+    #define SHL 3
     static int av[4][LENGTH_AV] ;
     static int idx_av=0;
     static int av_00=0,av_01=0,av_02=0,av_03=0;
@@ -69,6 +69,11 @@ int prev = 0;
     static void copy_data(uint16_t *dst, uint16_t *src, uint size)
     {
       for (int i=0; i<size; i++) dst[i] = src[i];
+    }
+
+    static void shift_copy_data(uint16_t *dst, uint16_t *src, uint size)
+    {
+      for (int i=0; i<size; i++) dst[i] = src[i]<<SHL;
     }
     // dump one mono channel chunk (NB_ELEM/2 16bits samples) from the i2s0 interface in dump_buff:
     static void my_copy_data(uint16_t *dst, uint16_t *src, uint size)
@@ -106,8 +111,9 @@ int prev = 0;
         unsigned int size;
 
         pi_i2s_read_status(&task, (void **)&chunk, &size);
-        copy_data(   (uint16_t *)(inSig + NB_ELEM), (uint16_t *) inSig, NB_ELEM);
-        my_copy_data((uint16_t *)(inSig), (uint16_t *) chunk, NB_ELEM);
+        copy_data((uint16_t *)(inSig), (uint16_t *) inSig + NB_ELEM, NB_ELEM);
+        //my_copy_data((uint16_t *)(inSig + NB_ELEM), (uint16_t *) chunk, NB_ELEM);
+        shift_copy_data((uint16_t *)(inSig + NB_ELEM), (uint16_t *) chunk, NB_ELEM);
         idx++;
 
         if (idx < 2){
@@ -225,6 +231,7 @@ void kws_ds_cnn(void)
         i2s_conf.channels = 1;
         i2s_conf.format = PI_I2S_FMT_DATA_FORMAT_PDM;
         i2s_conf.word_size = 16;
+        i2s_conf.pdm_decimation=128;
 
         pi_open_from_conf(&i2s, &i2s_conf);
 

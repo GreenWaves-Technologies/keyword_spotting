@@ -1,6 +1,7 @@
 import sounddevice as sd
 from scipy.io.wavfile import write
 import os
+import re
 
 from tensorflow.contrib.framework.python.ops import audio_ops
 from tensorflow.python.ops import io_ops
@@ -9,6 +10,7 @@ import sys
 import numpy as np
 
 LABELS = ["silence", "unknown", "yes","no","up","down","left","right","on","off","stop","go"]
+CLASS_MATCH = re.compile(r'Recognized:\t(?P<class>[0-9]+)\n')
 
 if len(sys.argv) < 2:
 	raise ValueError("give me a path to model")
@@ -38,6 +40,7 @@ while True:
 	sd.wait()  # Wait until recording is finished
 	idx = not idx
 	my_records[int(idx)] = sd.rec(DESIRED_SAMPLES, samplerate=fs, channels=1, dtype='int16')
+
 	# Run the spectrogram and MFCC ops to get a 2D 'fingerprint' of the audio.
 	spectrograms_power = audio_ops.audio_spectrogram(my_records[int(not idx)]/32678,
 											         window_size=FRAME_SIZE,
@@ -74,6 +77,20 @@ while True:
 	interpreter.invoke()
 	output = interpreter.get_tensor(output_details[0]['index'])
 	prediction = LABELS[np.argmax(output)]
-	print("Predicted: {} with confidence: {}".format(prediction, np.max(output)*output_details[0]['quantization'][0]))
-	write('from_pc/from_pc_{}_{}.wav'.format(count, prediction), fs, my_records[int(not idx)])
+
+	filename = 'from_pc/for_gap_{}.wav'.format(count)
+	write(filename, fs, my_records[int(not idx)])
+	ex_stream = os.popen("./kws_ds_cnn_emul {}".format(filename))
+	emul_log = ex_stream.readlines()
+	emul_prediction = None
+	for line in emul_log:
+		m = CLASS_MATCH.search(line)
+		if m:
+			emul_prediction = int(m['class'])
+			break
+	if emul_prediction is None:
+		print("Error encountered with './kws_ds_cnn_emul {}'".format(filename))
+		continue
+	print("Predicted: TFLITE/GAP: {}/{} with confidence: {}".format(prediction, LABELS[emul_prediction], np.max(output)*output_details[0]['quantization'][0]))
+
 	count += 1
