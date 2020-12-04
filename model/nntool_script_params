@@ -1,8 +1,9 @@
 set debug true
 adjust
 fusions --scale8
+show
 qshow
-nodeoption 1 PARALLELFEATURES 0
+LARGE_OPT
 set l3_ram_ext_managed false
 set graph_reorder_constant_in true
 set graph_produce_node_names true

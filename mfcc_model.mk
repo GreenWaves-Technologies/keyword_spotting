@@ -40,19 +40,31 @@ $(error You must set to 1 one of SMALL, MEDIUM, LARGE to select a network)
 endif
 endif
 endif
+PARAMS = $(MFCC_DIR)/MFCC_params_$(NN_SIZE).h $(LUTS)
+
+ifeq ($(USE_HIGH_PREC), 1)
+	EXTRA_DEF = -DUSE_HIGH_PREC=1
+else
+	EXTRA_DEF = -DUSE_HIGH_PREC=0
+endif
+ifeq ($(USE_POWER), 1)
+	EXTRA_DEF += -DUSE_POWER=1
+else
+	EXTRA_DEF += -DUSE_POWER=0
+endif
 
 $(MFCCBUILD_DIR):
 	mkdir $(MFCCBUILD_DIR)
 
 # Build the code generator from the model code
 $(MFCC_MODEL_GEN): $(MFCCBUILD_DIR)
-	gcc -g -o $(MFCC_MODEL_GEN) -I$(MFCC_DIR) -I$(TILER_INC) -I$(TILER_EMU_INC) $(SIZE_DEF) $(MFCC_DIR)/MFCCmodel.c $(MFCC_SRCG) $(TILER_LIB)  $(TABLE_CFLAGS) #$(SDL_FLAGS)
+	gcc -g -o $(MFCC_MODEL_GEN) $(EXTRA_DEF) -I$(MFCC_DIR) -I$(TILER_INC) -I$(TILER_EMU_INC) $(SIZE_DEF) $(MFCC_DIR)/MFCCmodel.c $(MFCC_SRCG) $(TILER_LIB)  $(TABLE_CFLAGS) #$(SDL_FLAGS)
 
-$(LUTS):
+$(PARAMS): $(MFCCBUILD_DIR)
 	python $(LUT_GEN_DIR)/gen_lut.py $(NN_SIZE)
 
 # Run the code generator  kernel code
-mfcc_model: $(MFCC_MODEL_GEN) $(LUTS)
+mfcc_model: $(PARAMS) $(MFCC_MODEL_GEN)
 	$(MFCC_MODEL_GEN) -o $(MFCCBUILD_DIR) -c $(MFCCBUILD_DIR) $(MODEL_GEN_EXTRA_FLAGS)
 
 clean_mfcc_model:

@@ -40,6 +40,7 @@ else
 			AT_INPUT_WIDTH=40
 			AT_INPUT_HEIGHT=98
 			APP_CFLAGS += -DLARGE
+			LARGE_OPT = nodeoption 1 PARALLELFEATURES 0
 		else
 $(error You must set to 1 one of SMALL, MEDIUM, LARGE to select a network)
 		endif
@@ -99,14 +100,13 @@ endif
 
 APP_CFLAGS += -O3 -s -mno-memcpy -fno-tree-loop-distribute-patterns 
 APP_CFLAGS += -I. -I$(MODEL_COMMON_INC) -I$(TILER_EMU_INC) -I$(TILER_INC) -I$(MODEL_BUILD) $(CNN_LIB_INCLUDE)
-APP_CFLAGS += -Icommon -I$(MFCC_DIR) -I$(MFCCBUILD_DIR) -I$(LUT_GEN_DIR)
 APP_CFLAGS += -DAT_MODEL_PREFIX=$(MODEL_PREFIX) $(MODEL_SIZE_CFLAGS)
 APP_CFLAGS += -DSTACK_SIZE=$(CLUSTER_STACK_SIZE) -DSLAVE_STACK_SIZE=$(CLUSTER_SLAVE_STACK_SIZE) -DFREQ_FC=$(FREQ_FC) -DFREQ_CL=$(FREQ_CL)
-APP_CFLAGS += -DAT_IMAGE=$(IMAGE) -DAT_WAV=$(WAV_PATH)  -DSILENT -DWRITE_WAV #-DPRINT_AT_INPUT #-DPRINT_WAV 
+APP_CFLAGS += -DAT_IMAGE=$(IMAGE) -DAT_WAV=$(WAV_PATH) -DWRITE_WAV #-DPRINT_AT_INPUT #-DPRINT_WAV 
 ifeq ($(platform), gvsoc)
 	APP_CFLAGS += -DPERF
 else
-	APP_CFLAGS += -DFROM_SENSOR 
+	APP_CFLAGS += -DFROM_SENSOR -DSILENT
 endif
 LIBS = -lm
 
@@ -122,7 +122,7 @@ test_accuracy_tflite:
 # all depends on the model
 all:: model mfcc_model
 
-clean:: #clean_at_model clean_mfcc_model
+clean:: clean_model clean_mfcc_model
 
 clean_at_model:
 	$(RM) $(MODEL_GEN_EXE)

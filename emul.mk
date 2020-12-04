@@ -37,6 +37,7 @@ else
 			AT_INPUT_WIDTH=40
 			AT_INPUT_HEIGHT=98
 			CFLAGS += -DLARGE
+			LARGE_OPT = nodeoption 1 PARALLELFEATURES 0
 		else
 $(error You must set to 1 one of SMALL, MEDIUM, LARGE to select a network)
 		endif
@@ -44,9 +45,6 @@ $(error You must set to 1 one of SMALL, MEDIUM, LARGE to select a network)
 endif
 MODEL_SQ8=1
 RM=rm -f
-
-IMAGE = $(CURDIR)/samples/yes_features_int8.pgm
-
 QUANT_BITS=8
 BUILD_DIR=BUILD
 

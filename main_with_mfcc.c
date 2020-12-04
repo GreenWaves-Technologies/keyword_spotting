@@ -51,7 +51,7 @@ short int *mfcc_features;
 short int *inSig;
 int count, idx, end1, end2;
 int rec_digit;
-int prev = 0;
+int prev = -1;
 
 
 #ifdef FROM_SENSOR
@@ -166,7 +166,7 @@ static void Runkws()
     PRINTF("class %d: %d\n", i, ResOut[i]);
   }
   if (highest<20000 && rec_digit!=0) rec_digit = 1;
-  if (prev!=1 && rec_digit!=prev) rec_digit = 1;
+  if (prev>0 && rec_digit!=prev) rec_digit = 1;
   prev = rec_digit;
 
   printf("Recognized: %s\twith confidence: %d\n", LABELS[rec_digit], highest);
@@ -322,6 +322,7 @@ while(1)
         printf("\n");
         printf("%45s: Cycles: %10d, Operations: %10d, Operations/Cycle: %f\n", "Total", TotalCycles, TotalOper, ((float) TotalOper)/ TotalCycles);
         printf("\n");
+        break;
     }
     #endif  /* PERF */
 
