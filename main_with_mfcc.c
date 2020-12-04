@@ -169,7 +169,8 @@ static void Runkws()
   if (prev>0 && rec_digit!=prev) rec_digit = 1;
   prev = rec_digit;
 
-  printf("Recognized: %s\twith confidence: %d\n", LABELS[rec_digit], highest);
+  if(rec_digit>1)
+    printf("Recognized: %s\twith confidence: %d\n", LABELS[rec_digit], highest);  
 }
 
 
@@ -249,6 +250,7 @@ void kws_ds_cnn(void)
 count=0;
 idx = 0;
 end1 = end2 = 0;
+printf("Waiting for command... [yes, no, up, down, left, right, on, off, stop, go]\n");
 while(1)
 {
     #ifndef FROM_SENSOR
