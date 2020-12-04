@@ -170,7 +170,14 @@ static void Runkws()
   prev = rec_digit;
 
   if(rec_digit>1)
-    printf("Recognized: %s\twith confidence: %d\n", LABELS[rec_digit], highest);  
+    printf("Recognized: %s\twith confidence: %d\n", LABELS[rec_digit], highest);
+
+#ifdef PERF
+    if (rec_digit!=8){
+        printf("App didn't recognize ON with %s test sample\n", WavName);
+        pmsis_exit(-1);
+    }
+#endif
 }
 
 
