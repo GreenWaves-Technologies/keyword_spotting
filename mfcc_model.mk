@@ -64,7 +64,7 @@ $(PARAMS): $(MFCCBUILD_DIR)
 	python3 $(LUT_GEN_DIR)/gen_lut.py $(NN_SIZE)
 
 # Run the code generator  kernel code
-$(MFCCBUILD_DIR)/MFCCKernels.c: $(PARAMS) $(MFCC_MODEL_GEN) $()
+$(MFCCBUILD_DIR)/MFCCKernels.c: $(PARAMS) $(MFCC_MODEL_GEN) 
 	$(MFCC_MODEL_GEN) -o $(MFCCBUILD_DIR) -c $(MFCCBUILD_DIR) $(MODEL_GEN_EXTRA_FLAGS)
 
 
