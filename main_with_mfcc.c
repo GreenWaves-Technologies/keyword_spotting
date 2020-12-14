@@ -21,7 +21,7 @@
     #include "KWS_ds_cnn_l_quantKernels.h"
     #include "MFCC_params_LARGE.h"
 #endif
-#include "wavIO.h"
+#include "gaplib/wavIO.h"
 #include "MFCCKernels.h"
 #include "LUT.def"
 #include "MFCC_FB.def"

@@ -1,11 +1,10 @@
 # User Test
 #------------------------------------------
-MFCC_DIR ?= $(CURDIR)/MFCC
+MFCC_GENERATOR ?= $(TILER_GENERATOR_PATH)/MFCC
 MFCCBUILD_DIR ?= $(CURDIR)/BUILD_MFCC_MODEL
 MFCC_MODEL_GEN = $(MFCCBUILD_DIR)/GenMFCC
-LUT_GEN_DIR = $(MFCC_DIR)
-LUTS = $(LUT_GEN_DIR)/MFCC_FB.def $(LUT_GEN_DIR)/LUT.def
-MFCC_SRCG += $(MFCC_DIR)/MFCC_Generator.c
+MFCC_SRCG += $(MFCC_GENERATOR)/MfccGenerator.c
+MFCC_KER_SRCS = $(MFCC_GENERATOR)/MfccBasicKernels.c $(MFCC_GENERATOR)/FFTLib.c 
 
 # Everything bellow is not application specific
 TABLE_CFLAGS=-lm
@@ -40,17 +39,12 @@ $(error You must set to 1 one of SMALL, MEDIUM, LARGE to select a network)
 endif
 endif
 endif
-PARAMS = $(MFCC_DIR)/MFCC_params_$(NN_SIZE).h $(LUTS)
 
-ifeq ($(USE_HIGH_PREC), 1)
-	EXTRA_DEF = -DUSE_HIGH_PREC=1
-else
-	EXTRA_DEF = -DUSE_HIGH_PREC=0
-endif
 ifeq ($(USE_POWER), 1)
-	EXTRA_DEF += -DUSE_POWER=1
-else
-	EXTRA_DEF += -DUSE_POWER=0
+	EXTRA_FLAGS = --use_power True
+endif
+ifeq ($(USE_HIGH_PREC), 1)
+	EXTRA_FLAGS += --use_high_prec
 endif
 
 $(MFCCBUILD_DIR):
@@ -58,15 +52,17 @@ $(MFCCBUILD_DIR):
 
 # Build the code generator from the model code
 $(MFCC_MODEL_GEN): $(MFCCBUILD_DIR)
-	gcc -g -o $(MFCC_MODEL_GEN) $(EXTRA_DEF) -I$(MFCC_DIR) -I$(TILER_INC) -I$(TILER_EMU_INC) $(SIZE_DEF) $(MFCC_DIR)/MFCCmodel.c $(MFCC_SRCG) $(TILER_LIB)  $(TABLE_CFLAGS) #$(SDL_FLAGS)
+	gcc -g -o $(MFCC_MODEL_GEN) -I. -I$(MFCC_GENERATOR) -I$(TILER_INC) -I$(TILER_EMU_INC) MFCCmodel.c $(MFCC_SRCG) $(TILER_LIB) $(TABLE_CFLAGS) $(SIZE_DEF)
 
-$(PARAMS): $(MFCCBUILD_DIR)
-	python3 $(LUT_GEN_DIR)/gen_lut.py $(NN_SIZE)
+gen_lut: $(MFCCBUILD_DIR)
+	python3 $(MFCC_GENERATOR)/GenLUT.py --fft_lut_file $(MFCCBUILD_DIR)/LUT.def --mfcc_bf_lut_file $(MFCCBUILD_DIR)/MFCC_FB.def                \
+									   --sample_rate 16000 --frame_size $(FRAME_SIZE) --frame_step $(FRAME_STEP) --n_frame $(AT_INPUT_HEIGHT) \
+									   --n_fft 1024 --n_dct 40 --mfcc_bank_cnt 40 --fmin 20 --fmax 4000 --mfcc_bank_cnt 40 --preempfactor 0.0 \
+									   --use_tf_mfcc --save_params_header MFCC_params_$(NN_SIZE).h $(EXTRA_FLAGS)
 
 # Run the code generator  kernel code
-$(MFCCBUILD_DIR)/MFCCKernels.c: $(PARAMS) $(MFCC_MODEL_GEN) 
+$(MFCCBUILD_DIR)/MFCCKernels.c: gen_lut $(MFCC_MODEL_GEN)
 	$(MFCC_MODEL_GEN) -o $(MFCCBUILD_DIR) -c $(MFCCBUILD_DIR) $(MODEL_GEN_EXTRA_FLAGS)
-
 
 mfcc_model: $(MFCCBUILD_DIR)/MFCCKernels.c
 

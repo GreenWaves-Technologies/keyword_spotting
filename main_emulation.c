@@ -29,7 +29,7 @@
     #include "MFCC_params_LARGE.h"
 #endif
 #ifdef WITH_MFCC
-    #include "wavIO.h"
+    #include "gaplib/wavIO.h"
 #else
     #include "gaplib/ImgIO.h"
 #endif
