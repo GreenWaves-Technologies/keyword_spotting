@@ -61,11 +61,14 @@ $(MFCC_MODEL_GEN): $(MFCCBUILD_DIR)
 	gcc -g -o $(MFCC_MODEL_GEN) $(EXTRA_DEF) -I$(MFCC_DIR) -I$(TILER_INC) -I$(TILER_EMU_INC) $(SIZE_DEF) $(MFCC_DIR)/MFCCmodel.c $(MFCC_SRCG) $(TILER_LIB)  $(TABLE_CFLAGS) #$(SDL_FLAGS)
 
 $(PARAMS): $(MFCCBUILD_DIR)
-	python $(LUT_GEN_DIR)/gen_lut.py $(NN_SIZE)
+	python3 $(LUT_GEN_DIR)/gen_lut.py $(NN_SIZE)
 
 # Run the code generator  kernel code
-mfcc_model: $(PARAMS) $(MFCC_MODEL_GEN)
+$(MFCCBUILD_DIR)/MFCCKernels.c: $(PARAMS) $(MFCC_MODEL_GEN) 
 	$(MFCC_MODEL_GEN) -o $(MFCCBUILD_DIR) -c $(MFCCBUILD_DIR) $(MODEL_GEN_EXTRA_FLAGS)
+
+
+mfcc_model: $(MFCCBUILD_DIR)/MFCCKernels.c
 
 clean_mfcc_model:
 	rm -rf $(MFCCBUILD_DIR)
