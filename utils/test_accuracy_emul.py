@@ -85,7 +85,7 @@ def main(_):
     print(compile_command)
     stream = os.popen(compile_command)
     for line in stream.readlines():
-    	print(line)
+    	print(line, end='')
     if not os.path.exists('./kws_ds_cnn_emul'):
     	raise Exception("Executable not generated correctly")
     executable = "kws_ds_cnn_emul"
@@ -148,6 +148,7 @@ def main(_):
       total_conf_matrix += conf_matrix
     if not(i % 100) and i > 0:
       print("Pred/Tot:\t{:4d}/{:4d}\tAccuracy:\t{:.2f}%".format(corrects, i, corrects/i*100))
+  print("\nFINAL VALIDATION ACCURACY:")
   print("Pred/Tot:\t{:4d}/{:4d}\tAccuracy:\t{:.2f}%\n".format(corrects, i, corrects/i*100))
   print("Confusion matrix:\n{}".format(total_conf_matrix))
 
@@ -194,6 +195,7 @@ def main(_):
       total_conf_matrix += conf_matrix
     if not(i % 100) and i > 0:
       print("Pred/Tot:\t{:4d}/{:4d}\tAccuracy:\t{:.2f}%".format(corrects, i, corrects/i*100))
+  print("\nFINAL TESTING ACCURACY:")
   print("Pred/Tot:\t{:4d}/{:4d}\tAccuracy:\t{:.2f}%\n".format(corrects, i, corrects/i*100))
   print("Confusion matrix:\n{}".format(total_conf_matrix))
   os.popen("rm test.pgm")
