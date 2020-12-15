@@ -40,8 +40,9 @@ endif
 endif
 endif
 
+EXTRA_FLAGS =
 ifeq ($(USE_POWER), 1)
-	EXTRA_FLAGS = --use_power
+	EXTRA_FLAGS += --use_power
 endif
 ifeq ($(USE_HIGH_PREC), 1)
 	EXTRA_FLAGS += --use_high_prec
