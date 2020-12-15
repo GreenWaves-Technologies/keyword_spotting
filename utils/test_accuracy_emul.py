@@ -81,7 +81,7 @@ def main(_):
     large = int("_l_" in FLAGS.tflite_model)
     if not small and not medium and not large:
       raise ValueError("You must select one of the models in model dir")
-    compile_command = 'make -f emul.mk clean_model clean all DUMP_TENSORS=0 SMALL={} MEDIUM={} LARGE={} WITH_MFCC={} USE_POWER={}'.format(small, medium, large, 1 if FLAGS.test_with_wav == True else 0, 1 if FLAGS.use_power_spectrogram == True else 0)
+    compile_command = 'make -f emul.mk clean_model clean all DUMP_TENSORS=0 SMALL={} MEDIUM={} LARGE={} WITH_MFCC={} USE_POWER={} USE_HIGH_PREC={}'.format(small, medium, large, 1 if FLAGS.test_with_wav == True else 0, 1 if FLAGS.use_power_spectrogram == True else 0, FLAGS.use_high_prec)
     print(compile_command)
     stream = os.popen(compile_command)
     for line in stream.readlines():
@@ -305,6 +305,10 @@ if __name__ == '__main__':
       '--use_power_spectrogram',
       type=int,
       default=1)
+  parser.add_argument(
+      '--use_high_prec',
+      type=int,
+      default=0)
 
   
   FLAGS, unparsed = parser.parse_known_args()

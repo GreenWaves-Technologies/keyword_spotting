@@ -14,7 +14,7 @@ USE_MIC_SENSORBOARD?=0
 
 WITH_MFCC ?= 1
 USE_POWER ?= 1
-USE_HIGH_PREC ?= 1
+USE_HIGH_PREC ?= 0
 SMALL  ?= 0
 MEDIUM ?= 0
 LARGE  ?= 0
@@ -125,7 +125,7 @@ generate_samples:
 	python3 utils/generate_samples_images.py --dct_coefficient_count $(DCT_COUNT) --window_size_ms $(FRAME_SIZE_ms) --window_stride_ms $(FRAME_STEP_ms)
 
 test_accuracy:
-	python3 utils/test_accuracy_emul.py --tflite_model $(TRAINED_TFLITE_MODEL) --dct_coefficient_count $(DCT_COUNT) --window_size_ms $(FRAME_SIZE_ms) --window_stride_ms $(FRAME_STEP_ms) --test_with_wav $(WITH_MFCC) --use_power_spectrogram $(USE_POWER)
+	python3 utils/test_accuracy_emul.py --tflite_model $(TRAINED_TFLITE_MODEL) --dct_coefficient_count $(DCT_COUNT) --window_size_ms $(FRAME_SIZE_ms) --window_stride_ms $(FRAME_STEP_ms) --test_with_wav $(WITH_MFCC) --use_power_spectrogram $(USE_POWER) --use_high_prec $(USE_HIGH_PREC)
 
 test_accuracy_tflite:
 	python3 utils/test_accuracy_tflite.py --tflite_model $(TRAINED_TFLITE_MODEL) --dct_coefficient_count $(DCT_COUNT) --window_size_ms $(FRAME_SIZE_ms) --window_stride_ms $(FRAME_STEP_ms) --use_power_spectrogram $(USE_POWER)

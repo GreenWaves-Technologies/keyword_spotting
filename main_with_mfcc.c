@@ -141,7 +141,7 @@ static void RunMFCC(){
     #ifdef PERF
         elapsed = gap_cl_readhwtimer() - start;
         total_cyc += elapsed;
-        printf("MFCC Total Cycles: %d\n\n\n", total_cyc);
+        printf("MFCC Total Cycles: %d Cycles/Frame %f \n\n\n", total_cyc, (float) total_cyc / N_FRAME);
     #endif
 }
 
