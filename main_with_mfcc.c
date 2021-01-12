@@ -49,7 +49,7 @@ AT_HYPERFLASH_FS_EXT_ADDR_TYPE __PREFIX(_L3_Flash) = 0;
 int num_samples;
 short int *mfcc_features;
 short int *inSig;
-int count, idx, end1, end2;
+int count, idx, end1;
 int rec_digit;
 int prev = -1;
 
@@ -196,15 +196,25 @@ void kws_ds_cnn(void)
     uint32_t voltage = VOLTAGE*1000;
     pi_freq_set(PI_FREQ_DOMAIN_FC, FREQ_FC*1000*1000);
     pi_freq_set(PI_FREQ_DOMAIN_CL, FREQ_CL*1000*1000);
-    if (VOLTAGE != 1.2)
-        PMU_set_voltage(voltage, 0);
-    printf("Set VDD voltage as %.2f, FC Frequency as %d MHz, CL Frequency = %d MHz\n", 
-        (float)voltage/1000, FREQ_FC, FREQ_CL);
+
+    #ifdef FREERTOS
+    // Set voltage (not working with freertos)
+    PMU_set_voltage(voltage, 0);
+
+    // Force the DCDC to not go in PFM mode (less noisy)
     pulp_write32(0x1A10414C,1);
+
+    // If you want to go slower and consume less power you need to force the FLL frequency 
+    // to be a multiple of the i2s CK (i.e. 2MHz). The pi_freq_set does not take care if 
+    // this automatically.
     if (FREQ_FC==10)
         pulp_write32(0x1A100004,0x94000FA0);
     if (FREQ_FC==20)
         pulp_write32(0x1A100004,0x92000FA0);
+    #endif
+
+    printf("Set VDD voltage as %.2f, FC Frequency as %d MHz, CL Frequency = %d MHz\n", 
+        (float)voltage/1000, FREQ_FC, FREQ_CL);
 
     printf("Entering main controller\n");
     /* Configure And open cluster. */
@@ -242,7 +252,7 @@ void kws_ds_cnn(void)
         struct pi_i2s_conf i2s_conf;
         pi_i2s_conf_init(&i2s_conf);
 
-        // Configure first interface for PDM 44100KHz DDR
+        // Configure first interface for PDM 16kHz DDR
         // Also gives the 2 buffers for double-buffering the sampling
         #ifdef USE_EXT_CLK
         i2s_conf.options = PI_I2S_OPT_EXT_CLK | PI_I2S_OPT_EXT_WS;
@@ -255,7 +265,7 @@ void kws_ds_cnn(void)
         i2s_conf.channels = 1;
         i2s_conf.format = PI_I2S_FMT_DATA_FORMAT_PDM;
         i2s_conf.word_size = 16;
-        i2s_conf.pdm_decimation=128;
+        i2s_conf.pdm_decimation = 128; // --> 16kHz * 128 = 2.048MHz
 
         pi_open_from_conf(&i2s, &i2s_conf);
 
@@ -272,7 +282,7 @@ void kws_ds_cnn(void)
 
 count=0;
 idx = 0;
-end1 = end2 = 0;
+end1 = 0;
 printf("Waiting for command... [yes, no, up, down, left, right, on, off, stop, go]\n");
 #ifndef FROM_SENSOR
     printf("Reading wav...\n");
@@ -294,14 +304,13 @@ while(1)
         //pi_task_block(&ready_to_process);
         pi_i2s_read_async(&i2s, pi_task_callback(&task, end_of_capture, NULL));
         // Wait until acquisition is finished
-        while(idx<2 || (end1==0 && end2==0))
+        while(idx<2 || end1==0)
           {
             pi_yield();
           }
         //pi_task_wait_on(&ready_to_process);
         count++;
         if (end1) end1 = 0;
-        if (end2) end2 = 0;
 
         #ifdef WRITE_WAV
             char FileName[100];

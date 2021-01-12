@@ -96,6 +96,9 @@ endif
 ifeq ($(USE_HIGH_PREC), 1)
 	APP_CFLAGS += -DHIGH_PREC_FFT
 endif
+ifeq ($(PMSIS_OS), freertos)
+	APP_CFLAGS += -DFREERTOS
+endif
 
 APP_CFLAGS += -O3 -s -mno-memcpy -fno-tree-loop-distribute-patterns 
 APP_CFLAGS += -I. -I$(MODEL_COMMON_INC) -I$(TILER_EMU_INC) -I$(TILER_INC) -I$(MODEL_BUILD) $(CNN_LIB_INCLUDE)
