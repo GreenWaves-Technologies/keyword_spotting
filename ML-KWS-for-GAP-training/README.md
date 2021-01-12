@@ -45,12 +45,11 @@ python freeze.py --model_architecture dnn --model_size_info 128 128 128 --checkp
 <checkpoint path> --output_file dnn.pb
 ```
 
-Once you froze your model you can convert it to tflite and feed the GAPflow.
+Once you froze your model you can convert it to tflite and feed the GAPflow, read below for the tflite converter commands.
 
 ## Reproduce our results
 
-Here we present the accuracy achieved by the ds_cnn family with both power and 
-spectrogram mfcc features in their different size settings and the commands that reproduce them:
+Here we present the accuracy achieved by the ds_cnn family with both power and spectrogram mfcc features in their different size settings and the commands that reproduce them:
 
 ## Power MFCC
 

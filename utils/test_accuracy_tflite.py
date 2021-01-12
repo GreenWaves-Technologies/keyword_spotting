@@ -13,7 +13,8 @@ import input_data
 
 def prepare_model_settings(label_count, sample_rate, clip_duration_ms,
                            window_size_ms, window_stride_ms,
-                           dct_coefficient_count, preprocess='mfcc'):
+                           dct_coefficient_count, preprocess='mfcc',
+                           use_power_spectrogram=True):
   """Calculates common settings needed for all models.
 
   Args:

@@ -59,6 +59,7 @@ int prev = -1;
     static struct pi_device i2s;
     static int end = 0;
     static pi_task_t task;
+    static pi_task_t ready_to_process;
     static short *chunk;
     #define LENGTH_AV 32
     #define SHL 3
@@ -121,6 +122,7 @@ int prev = -1;
         }
         else {
           end1 = 1;
+          //pi_task_push(&ready_to_process);
         }
 
     }
@@ -166,7 +168,6 @@ static void Runkws()
     PRINTF("class %d: %d\n", i, ResOut[i]);
   }
   if (highest<20000 && rec_digit!=0) rec_digit = 1;
-  if (prev>0 && rec_digit!=prev) rec_digit = 1;
   prev = rec_digit;
 
   if(rec_digit>1)
@@ -183,14 +184,27 @@ static void Runkws()
 
 void kws_ds_cnn(void)
 {
+// struct pi_device gpio_a1;
+// struct pi_gpio_conf gpio_conf;
+// pi_pad_set_function(PI_PAD_12_A3_RF_PACTRL0, PI_PAD_12_A3_GPIO_A0_FUNC1);
+// pi_gpio_e gpio_out_a1 = PI_GPIO_A0_PAD_12_A3;
+// pi_gpio_flags_e cfg_flags = PI_GPIO_OUTPUT;
+// pi_gpio_pin_configure(&gpio_a1, gpio_out_a1, cfg_flags);
+// pi_gpio_pin_write(&gpio_a1, gpio_out_a1, 0);
+
     // Voltage-Frequency settings
-    uint32_t voltage =1200;
+    uint32_t voltage = VOLTAGE*1000;
     pi_freq_set(PI_FREQ_DOMAIN_FC, FREQ_FC*1000*1000);
     pi_freq_set(PI_FREQ_DOMAIN_CL, FREQ_CL*1000*1000);
-    //PMU_set_voltage(voltage, 0);
+    if (VOLTAGE != 1.2)
+        PMU_set_voltage(voltage, 0);
     printf("Set VDD voltage as %.2f, FC Frequency as %d MHz, CL Frequency = %d MHz\n", 
         (float)voltage/1000, FREQ_FC, FREQ_CL);
     pulp_write32(0x1A10414C,1);
+    if (FREQ_FC==10)
+        pulp_write32(0x1A100004,0x94000FA0);
+    if (FREQ_FC==20)
+        pulp_write32(0x1A100004,0x92000FA0);
 
     printf("Entering main controller\n");
     /* Configure And open cluster. */
@@ -230,7 +244,9 @@ void kws_ds_cnn(void)
 
         // Configure first interface for PDM 44100KHz DDR
         // Also gives the 2 buffers for double-buffering the sampling
+        #ifdef USE_EXT_CLK
         i2s_conf.options = PI_I2S_OPT_EXT_CLK | PI_I2S_OPT_EXT_WS;
+        #endif
         i2s_conf.pingpong_buffers[0] = buff[0];
         i2s_conf.pingpong_buffers[1] = buff[1];
         i2s_conf.block_size = NB_ELEM*sizeof(short);
@@ -258,26 +274,31 @@ count=0;
 idx = 0;
 end1 = end2 = 0;
 printf("Waiting for command... [yes, no, up, down, left, right, on, off, stop, go]\n");
+#ifndef FROM_SENSOR
+    printf("Reading wav...\n");
+    header_struct header_info;
+    if (ReadWavFromFile(WavName, inSig, WAV_BUFFER_SIZE*sizeof(short int), &header_info)){
+        printf("Error reading wav file\n");
+        pmsis_exit(1);
+    }
+    num_samples = header_info.DataSize * 8 / (header_info.NumChannels * header_info.BitsPerSample);
+    printf("Finished Read wav...\n");
+#endif
 while(1)
 {
-    #ifndef FROM_SENSOR
-        header_struct header_info;
-        if (ReadWavFromFile(WavName, inSig, WAV_BUFFER_SIZE*sizeof(short int), &header_info)){
-            printf("Error reading wav file\n");
-            pmsis_exit(1);
-        }
-        num_samples = header_info.DataSize * 8 / (header_info.NumChannels * header_info.BitsPerSample);
-    #else
+    #ifdef FROM_SENSOR
         unsigned int size;
 
         // Once it returns, chunk will point to the next available buffer
         // containing samples.
+        //pi_task_block(&ready_to_process);
         pi_i2s_read_async(&i2s, pi_task_callback(&task, end_of_capture, NULL));
         // Wait until acquisition is finished
         while(idx<2 || (end1==0 && end2==0))
           {
             pi_yield();
           }
+        //pi_task_wait_on(&ready_to_process);
         count++;
         if (end1) end1 = 0;
         if (end2) end2 = 0;
@@ -290,7 +311,7 @@ while(1)
                            (void *)inSig, WAV_BUFFER_SIZE * sizeof(short int));
         #endif
     #endif
-
+// pi_gpio_pin_write(&gpio_a1, gpio_out_a1, 1);
     struct pi_cluster_task task_mfcc = {0};
     task_mfcc.entry = RunMFCC;
     task_mfcc.arg = NULL;
@@ -318,6 +339,7 @@ while(1)
 	task_net->slave_stack_size = SLAVE_STACK_SIZE;
 	task_net->arg = NULL;
 	pi_cluster_send_task_to_cl(&cluster_dev, task_net);
+// pi_gpio_pin_write(&gpio_a1, gpio_out_a1, 0);
 
     #ifdef PERF
     {
