@@ -66,17 +66,17 @@ Accuracy calculated with the testing partition of the (Google Speech Commands da
 The timings and power measurements are calculated executing the MFCC+CNN over 1s windows with 50% overlap between consecutive windows:
 
 
-| Model           | Preprocessing                   | Freq FC <br /> [MHz] | Freq CL <br /> [MHz] | Voltage <br /> [V] | T<sub>MFCC</sub> <br /> [ms] | T<sub>CNN</sub> <br /> [ms] | Energy <br /> [mJ] |
-|-----------------|---------------------------------|---------|---------|---------|-----------------|----------------|--------|
-| DS_CNN SMALL    | GWT MFCC (int16)                | 250     | 175     | 1.2     | 6.8             | 3.76           | 13.0   |
-| DS_CNN SMALL    | GWT MFCC (int16)                | 10      | 10      | 1.0     | 119             | 68             | 0.16   |
-| DS_CNN SMALL    | GWT MFCC (High Precision int32) | 250     | 175     | 1.2     | 18.5            | 3.76           | 14.3   |
-| DS_CNN SMALL    | GWT MFCC (High Precision int32) | 10      | 10      | 1.0     | 327             | 68             | 0.25   |
-| DS_CNN MEDIUM   | GWT MFCC (int16)                | 250     | 175     | 1.2     | 6.8             | 14.4           | 13.9   |
-| DS_CNN MEDIUM   | GWT MFCC (int16)                | 10      | 10      | 1.0     | 119             | 253            | 0.22   |
-| DS_CNN MEDIUM   | GWT MFCC (High Precision int32) | 250     | 175     | 1.2     | 18.5            | 14.4           | 15.4   |
-| DS_CNN MEDIUM   | GWT MFCC (High Precision int32) | 10      | 15      | 1.0     | 220             | 176            | 0.32   |
-| DS_CNN LARGE    | GWT MFCC (int16)                | 250     | 175     | 1.2     | 6.8             | 38             | 15.7   |
-| DS_CNN LARGE    | GWT MFCC (int16)                | 10      | 20      | 1.0     | 62              | 361            | 0.36   |
-| DS_CNN LARGE    | GWT MFCC (High Precision int32) | 250     | 175     | 1.2     | 18.5            | 38             | 17.0   |
-| DS_CNN LARGE    | GWT MFCC (High Precision int32) | 10      | 25      | 1.0     | 134             | 301            | 0.45   |
+| Model           | Preprocessing                   | Freq FC <br /> [MHz] | Freq CL <br /> [MHz] | Voltage <br /> [V] | T<sub>MFCC</sub> <br /> [ms] | T<sub>CNN</sub> <br /> [ms] | P<sub>MFCC</sub> <br /> [mW] | P<sub>CNN</sub> <br /> [mW] | P<sub>avg</sub> <br /> [mW] | 
+|-----------------|---------------------------------|---------|---------|---------|-----------------|----------------|------|------|------|
+| DS_CNN SMALL    | GWT MFCC (int16)                | 250     | 175     | 1.2     | 6.8             | 3.76           | 1.14 | 0.80 | 25.8 |
+| DS_CNN SMALL    | GWT MFCC (int16)                | 10      | 10      | 1.0     | 119             | 68             | 1.41 | 0.81 | 4.8  |
+| DS_CNN SMALL    | GWT MFCC (High Precision int32) | 250     | 175     | 1.2     | 18.5            | 3.76           | 4.33 | 0.80 | 28.4 |
+| DS_CNN SMALL    | GWT MFCC (High Precision int32) | 10      | 10      | 1.0     | 327             | 68             | 4.33 | 0.84 | 6.9  |
+| DS_CNN MEDIUM   | GWT MFCC (int16)                | 250     | 175     | 1.2     | 6.8             | 14.4           | 1.26 | 3.25 | 27.5 |
+| DS_CNN MEDIUM   | GWT MFCC (int16)                | 10      | 10      | 1.0     | 119             | 253            | 1.33 | 3.29 | 6.5  |
+| DS_CNN MEDIUM   | GWT MFCC (High Precision int32) | 250     | 175     | 1.2     | 18.5            | 14.4           | 4.31 | 3.33 | 30.2 |
+| DS_CNN MEDIUM   | GWT MFCC (High Precision int32) | 10      | 15      | 1.0     | 220             | 176            | 3.69 | 2.89 | 8.3  |
+| DS_CNN LARGE    | GWT MFCC (int16)                | 250     | 175     | 1.2     | 6.8             | 38             | 1.26 | 7.9  | 28.2 |
+| DS_CNN LARGE    | GWT MFCC (int16)                | 10      | 20      | 1.0     | 62              | 361            | 1.04 | 6.74 | 9.2  |
+| DS_CNN LARGE    | GWT MFCC (High Precision int32) | 250     | 175     | 1.2     | 18.5            | 38             | 4.31 | 7.84 | 33.8 |
+| DS_CNN LARGE    | GWT MFCC (High Precision int32) | 10      | 25      | 1.0     | 134             | 301            | 3.31 | 6.42 | 11.2 |

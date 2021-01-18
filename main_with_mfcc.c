@@ -12,14 +12,17 @@
 #ifdef SMALL
     #include "KWS_ds_cnn_s_quantKernels.h"
     #include "MFCC_params_SMALL.h"
+    #define L1_SIZE _KWS_ds_cnn_s_quant_L1_Memory_SIZE
 #endif
 #ifdef MEDIUM
     #include "KWS_ds_cnn_m_quantKernels.h"
     #include "MFCC_params_MEDIUM.h"
+    #define L1_SIZE _KWS_ds_cnn_m_quant_L1_Memory_SIZE
 #endif
 #ifdef LARGE
     #include "KWS_ds_cnn_l_quantKernels.h"
     #include "MFCC_params_LARGE.h"
+    #define L1_SIZE _KWS_ds_cnn_l_quant_L1_Memory_SIZE
 #endif
 #include "gaplib/wavIO.h"
 #include "MFCCKernels.h"
@@ -197,21 +200,22 @@ void kws_ds_cnn(void)
     pi_freq_set(PI_FREQ_DOMAIN_FC, FREQ_FC*1000*1000);
     pi_freq_set(PI_FREQ_DOMAIN_CL, FREQ_CL*1000*1000);
 
-    #ifdef FREERTOS
+    #ifndef FREERTOS
     // Set voltage (not working with freertos)
-    PMU_set_voltage(voltage, 0);
+    if (VOLTAGE != 1.2)
+        PMU_set_voltage(voltage, 0);
+    #endif
 
     // Force the DCDC to not go in PFM mode (less noisy)
-    pulp_write32(0x1A10414C,1);
+    *(uint32_t *)0x1A10414C = 1;
 
     // If you want to go slower and consume less power you need to force the FLL frequency 
     // to be a multiple of the i2s CK (i.e. 2MHz). The pi_freq_set does not take care if 
     // this automatically.
     if (FREQ_FC==10)
-        pulp_write32(0x1A100004,0x94000FA0);
+        *(uint32_t *) 0x1A100004 = 0x94000FA0;
     if (FREQ_FC==20)
-        pulp_write32(0x1A100004,0x92000FA0);
-    #endif
+        *(uint32_t *) 0x1A100004 = 0x92000FA0;
 
     printf("Set VDD voltage as %.2f, FC Frequency as %d MHz, CL Frequency = %d MHz\n", 
         (float)voltage/1000, FREQ_FC, FREQ_CL);
@@ -255,6 +259,7 @@ void kws_ds_cnn(void)
         // Configure first interface for PDM 16kHz DDR
         // Also gives the 2 buffers for double-buffering the sampling
         #ifdef USE_EXT_CLK
+        printf("Setting External CLK\n");
         i2s_conf.options = PI_I2S_OPT_EXT_CLK | PI_I2S_OPT_EXT_WS;
         #endif
         i2s_conf.pingpong_buffers[0] = buff[0];
@@ -320,7 +325,16 @@ while(1)
                            (void *)inSig, WAV_BUFFER_SIZE * sizeof(short int));
         #endif
     #endif
-// pi_gpio_pin_write(&gpio_a1, gpio_out_a1, 1);
+    // pi_gpio_pin_write(&gpio_a1, gpio_out_a1, 1);
+    if (count > 1) {
+        if (pi_cluster_open(&cluster_dev))
+        {
+            printf("Cluster open failed !\n");
+            pmsis_exit(-4);
+        }
+        __PREFIX(_L1_Memory) = (AT_L1_POINTER) AT_L1_ALLOC(0, L1_SIZE);
+        if (__PREFIX(_L1_Memory) == 0) printf("Error reallocating L1\n");;
+    }
     struct pi_cluster_task task_mfcc = {0};
     task_mfcc.entry = RunMFCC;
     task_mfcc.arg = NULL;
@@ -365,6 +379,8 @@ while(1)
         break;
     }
     #endif  /* PERF */
+    AT_L1_FREE(0, __PREFIX(_L1_Memory), L1_SIZE);
+    pi_cluster_close(&cluster_dev);
 
 }
     #ifdef FROM_SENSOR
@@ -378,7 +394,6 @@ while(1)
     pi_l2_free(ImageIn, AT_INPUT_WIDTH * AT_INPUT_HEIGHT * sizeof(char));
     pi_l2_free(ResOut,  NUM_CLASSES*sizeof(short int));
     // Close the cluster
-    pi_cluster_close(&cluster_dev);
     PRINTF("Ended\n");
     pmsis_exit(0);
 }
