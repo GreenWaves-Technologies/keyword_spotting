@@ -46,6 +46,8 @@ ifeq ($(USE_POWER), 1)
 endif
 ifeq ($(USE_HIGH_PREC), 1)
 	EXTRA_FLAGS += --use_high_prec
+else ifeq ($(FIX32), 1)
+	EXTRA_ARGS += --use_high_prec
 endif
 
 $(MFCCBUILD_DIR):
