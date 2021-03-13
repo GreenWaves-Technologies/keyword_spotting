@@ -47,7 +47,7 @@
     SCALE = DCT_NORMALIZATION * 2**(-QDCT) / NNTOOL_INPUT_SCALE_FLOAT
 */
 #define  INPUT_SCALE        236
-#define  INPUT_SCALEN       16
+#define  INPUT_SCALEN       17
 
 
 static char *LABELS[NUM_CLASSES] = {"silence", "unknown", "yes", "no", "up", "down", "left", "right", "on", "off", "stop", "go"};
