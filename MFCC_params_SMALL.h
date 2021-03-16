@@ -14,4 +14,3 @@
 #define	N_DCT                        40
 #define	OUTPUT_MELSPECTROGRAM         0
 #define	LIFTER_COEFF                  0
-#define	USE_DB                        0
