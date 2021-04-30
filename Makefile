@@ -38,7 +38,6 @@ else
 		ifeq ($(LARGE), 1)
 			MODEL_PREFIX = KWS_ds_cnn_l_quant
 			APP_CFLAGS += -DLARGE
-			LARGE_OPT = nodeoption 1 PARALLELFEATURES 0
 		else
 $(error You must set to 1 one of SMALL, MEDIUM, LARGE to select a network)
 		endif
@@ -56,9 +55,17 @@ READFS_FILES=$(realpath $(MODEL_TENSORS))
 QUANT_BITS=8
 BUILD_DIR=BUILD
 
+#MODEL_NE16 ?= 0
 NNTOOL_SCRIPT_PARAMETRIC=model/nntool_script_params
-NNTOOL_EXTRA_FLAGS = -q
 MODEL_SUFFIX = _$(QUANT_BITS)BIT
+ifeq ($(MODEL_NE16), 1)
+	NNTOOL_SCRIPT_PARAMETRIC=model/nntool_script_ne16_params
+	MODEL_SUFFIX = _NE16
+endif
+ifeq ($(DUMP_TENSORS), 1)
+	NNTOOL_SET_GRAPH_DUMP = set graph_dump_tensor 7
+endif
+NNTOOL_EXTRA_FLAGS = -q
 MODEL_BUILD = BUILD_MODEL_$(QUANT_BITS)BIT
 
 CLUSTER_STACK_SIZE=4096

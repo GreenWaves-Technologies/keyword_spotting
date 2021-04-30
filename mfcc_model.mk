@@ -51,18 +51,19 @@ endif
 $(MFCCBUILD_DIR):
 	mkdir $(MFCCBUILD_DIR)
 
-# Build the code generator from the model code
-$(MFCC_MODEL_GEN): $(MFCCBUILD_DIR)
-	gcc -g -o $(MFCC_MODEL_GEN) -I. -I$(MFCC_GENERATOR) -I$(TILER_INC) -I$(TILER_EMU_INC) MFCCmodel.c $(MFCC_SRCG) $(TILER_LIB) $(TABLE_CFLAGS) $(SIZE_DEF)
-
-gen_lut: $(MFCCBUILD_DIR)
+$(MFCCBUILD_DIR)/LUT.def: $(MFCCBUILD_DIR)
 	python3 $(MFCC_GENERATOR)/GenLUT.py --fft_lut_file $(MFCCBUILD_DIR)/LUT.def --mfcc_bf_lut_file $(MFCCBUILD_DIR)/MFCC_FB.def                \
 									   --sample_rate 16000 --frame_size $(FRAME_SIZE) --frame_step $(FRAME_STEP) --n_frame $(AT_INPUT_HEIGHT) \
 									   --n_fft 1024 --n_dct 40 --mfcc_bank_cnt 40 --fmin 20 --fmax 4000 --mfcc_bank_cnt 40 --preempfactor 0.0 \
 									   --use_tf_mfcc --save_params_header MFCC_params_$(NN_SIZE).h $(EXTRA_FLAGS)
 
+# Build the code generator from the model code
+$(MFCC_MODEL_GEN): $(MFCCBUILD_DIR)/LUT.def $(MFCCBUILD_DIR)
+	gcc -g -o $(MFCC_MODEL_GEN) -I. -I$(MFCC_GENERATOR) -I$(TILER_INC) -I$(TILER_EMU_INC) MFCCmodel.c $(MFCC_SRCG) $(TILER_LIB) $(TABLE_CFLAGS) $(SIZE_DEF)
+
+
 # Run the code generator  kernel code
-$(MFCCBUILD_DIR)/MFCCKernels.c: gen_lut $(MFCC_MODEL_GEN)
+$(MFCCBUILD_DIR)/MFCCKernels.c: $(MFCC_MODEL_GEN)
 	$(MFCC_MODEL_GEN) -o $(MFCCBUILD_DIR) -c $(MFCCBUILD_DIR) $(MODEL_GEN_EXTRA_FLAGS)
 
 mfcc_model: $(MFCCBUILD_DIR)/MFCCKernels.c
