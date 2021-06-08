@@ -11,17 +11,17 @@
 #include "Gap.h"
 #ifdef SMALL
     #include "KWS_ds_cnn_s_quantKernels.h"
-    #include "MFCC_params_SMALL.h"
+    #include "MFCC_params.h"
     #define L1_SIZE _KWS_ds_cnn_s_quant_L1_Memory_SIZE
 #endif
 #ifdef MEDIUM
     #include "KWS_ds_cnn_m_quantKernels.h"
-    #include "MFCC_params_MEDIUM.h"
+    #include "MFCC_params.h"
     #define L1_SIZE _KWS_ds_cnn_m_quant_L1_Memory_SIZE
 #endif
 #ifdef LARGE
     #include "KWS_ds_cnn_l_quantKernels.h"
-    #include "MFCC_params_LARGE.h"
+    #include "MFCC_params.h"
     #define L1_SIZE _KWS_ds_cnn_l_quant_L1_Memory_SIZE
 #endif
 #include "gaplib/wavIO.h"
@@ -29,13 +29,16 @@
 #include "LUT.def"
 #include "MFCC_FB.def"
 
-#define  WAV_BUFFER_SIZE    16000 // 1sec@16kHz
+#define  WAV_BUFFER_SIZE    16000 // Something more than 1sec@16kHz
 #define  NUM_CLASSES        12
+#define  N_FRAME            49
+#define  NORM               3
+#define  MFCC_Q             15-NORM-7
 
-//DCT_NORMALIZATION        -> np.sqrt(1/(N_DCT))*0.5
+//DCT_NORMALIZATION        -> np.sqrt(2/(N_DCT))*0.5
 //NNTOOL_INPUT_SCALE_FLOAT -> 1.9372712
-// SCALE = DCT_NORMALIZATION*NNTOOL_INPUT_SCALE_FLOAT/DCT_SCALE
-// MFCC -> Q(10-Norm) Norm=5
+// SCALE = DCT_NORMALIZATION*DCT_SCALE/NNTOOL_INPUT_SCALE_FLOAT
+// DCT_SCALE = 2**(-MFCC_Q)
 #define  INPUT_SCALE        236
 #define  INPUT_SCALEN       17
 
@@ -143,7 +146,11 @@ static void RunMFCC(){
         start = gap_cl_readhwtimer();
     #endif
     // run inference on inSig[0:WAV_BUFFER_SIZE] and inSig[WAV_BUFFER_SIZE/2:WAV_BUFER_SIZE*3/2] alternately
-    MFCC(inSig, mfcc_features, 0, TwiddlesLUT, SwapLUT, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, 5, DCT_Coeff);
+    #if (DATA_TYPE==1) //HIGH PRECISION 32BITS FFT
+    MFCC(inSig, mfcc_features, TwiddlesLUTR2, SwapTableR2, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, NORM, DCT_Coeff);
+    #else //LOW PRECISION 16BITS FFT
+    MFCC(inSig, mfcc_features, TwiddlesLUTR2, RFFTTwiddlesLUT, SwapTableR2, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, NORM, DCT_Coeff);
+    #endif
     #ifdef PERF
         elapsed = gap_cl_readhwtimer() - start;
         total_cyc += elapsed;

@@ -56,17 +56,14 @@ QUANT_BITS=8
 BUILD_DIR=BUILD
 
 #MODEL_NE16 ?= 0
-NNTOOL_SCRIPT_PARAMETRIC=model/nntool_script_params
-MODEL_SUFFIX = _$(QUANT_BITS)BIT
+NNTOOL_SCRIPT=model/nntool_script
+MODEL_SUFFIX = _SQ$(QUANT_BITS)
 ifeq ($(MODEL_NE16), 1)
-	NNTOOL_SCRIPT_PARAMETRIC=model/nntool_script_ne16_params
+	NNTOOL_SCRIPT=model/nntool_script_ne16
 	MODEL_SUFFIX = _NE16
 endif
-ifeq ($(DUMP_TENSORS), 1)
-	NNTOOL_SET_GRAPH_DUMP = set graph_dump_tensor 7
-endif
 NNTOOL_EXTRA_FLAGS = -q
-MODEL_BUILD = BUILD_MODEL_$(QUANT_BITS)BIT
+MODEL_BUILD = BUILD_MODEL$(MODEL_SUFFIX)
 
 CLUSTER_STACK_SIZE=4096
 CLUSTER_SLAVE_STACK_SIZE=1024
@@ -83,25 +80,23 @@ endif
 FREQ_FC?=250
 VOLTAGE?=1.2
 
-include common/model_decl.mk
 ifeq ($(USE_POWER), 1)
 	# override the tflite model name to the one which expects power MFCC -> more efficient
-	TRAINED_TFLITE_MODEL=model/$(MODEL_PREFIX)_power.tflite
+	TRAINED_MODEL=model/$(MODEL_PREFIX)_power.tflite
+else
+	TRAINED_MODEL=model/$(MODEL_PREFIX).tflite
 endif
+include common/model_decl.mk
+include mfcc_model.mk
 
 
 ifeq ($(WITH_MFCC), 1)
 	APP_SRCS    += main_with_mfcc.c $(MODEL_GEN_C) $(MODEL_COMMON_SRCS) $(CNN_LIB)
-	APP_SRCS    += $(GAP_LIB_PATH)/wav_io/wavIO.c $(MFCC_KER_SRCS) $(MFCCBUILD_DIR)/MFCCKernels.c
+	APP_SRCS    += $(GAP_LIB_PATH)/wav_io/wavIO.c $(MFCCBUILD_DIR)/MFCCKernels.c $(TILER_DSP_KERNEL_PATH)/LUT_Tables/TwiddlesDef.c $(TILER_DSP_KERNEL_PATH)/LUT_Tables/RFFTTwiddlesDef.c $(TILER_DSP_KERNEL_PATH)/LUT_Tables/SwapTablesDef.c
+	APP_SRCS  	+= $(TILER_DSP_KERNEL_PATH)/MfccBasicKernels.c $(TILER_DSP_KERNEL_PATH)/FFT_Library.c $(TILER_DSP_KERNEL_PATH)/CmplxFunctions.c $(TILER_DSP_KERNEL_PATH)/PreProcessing.c 
 	APP_CFLAGS  += -I$(MFCC_GENERATOR) -I$(MFCCBUILD_DIR)
 else
 	APP_SRCS    += main.c $(MODEL_GEN_C) $(MODEL_COMMON_SRCS) $(CNN_LIB)
-endif
-ifeq ($(USE_POWER), 0)
-	APP_CFLAGS += -DUSE_ABS
-endif
-ifeq ($(USE_HIGH_PREC), 1)
-	APP_CFLAGS += -DHIGH_PREC_FFT
 endif
 ifeq ($(PMSIS_OS), freertos)
 	APP_CFLAGS += -DFREERTOS
@@ -111,7 +106,7 @@ APP_CFLAGS += -O3 -s -mno-memcpy -fno-tree-loop-distribute-patterns
 APP_CFLAGS += -I. -I$(MODEL_COMMON_INC) -I$(TILER_EMU_INC) -I$(TILER_INC) -I$(MODEL_BUILD) $(CNN_LIB_INCLUDE)
 APP_CFLAGS += -DAT_MODEL_PREFIX=$(MODEL_PREFIX) $(MODEL_SIZE_CFLAGS)
 APP_CFLAGS += -DSTACK_SIZE=$(CLUSTER_STACK_SIZE) -DSLAVE_STACK_SIZE=$(CLUSTER_SLAVE_STACK_SIZE) -DFREQ_FC=$(FREQ_FC) -DFREQ_CL=$(FREQ_CL) -DVOLTAGE=$(VOLTAGE)
-APP_CFLAGS += -DAT_IMAGE=$(IMAGE) -DAT_WAV=$(WAV_PATH) #-DWRITE_WAV #-DPRINT_AT_INPUT #-DPRINT_WAV 
+APP_CFLAGS += -DAT_IMAGE=$(IMAGE) -DAT_WAV=$(WAV_PATH)
 
 ifeq ($(USE_MIC_SENSORBOARD), 1)
 	APP_CFLAGS += -DFROM_SENSOR -DSILENT
@@ -127,26 +122,18 @@ generate_samples:
 	python3 utils/generate_samples_images.py --dct_coefficient_count $(DCT_COUNT) --window_size_ms $(FRAME_SIZE_ms) --window_stride_ms $(FRAME_STEP_ms)
 
 test_accuracy:
-	python3 utils/test_accuracy_emul.py --tflite_model $(TRAINED_TFLITE_MODEL) --dct_coefficient_count $(DCT_COUNT) --window_size_ms $(FRAME_SIZE_ms) --window_stride_ms $(FRAME_STEP_ms) --test_with_wav $(WITH_MFCC) --use_power_spectrogram $(USE_POWER) --use_high_prec $(USE_HIGH_PREC)
+	python3 utils/test_accuracy_emul.py --tflite_model $(TRAINED_MODEL) --dct_coefficient_count $(DCT_COUNT) --window_size_ms $(FRAME_SIZE_ms) --window_stride_ms $(FRAME_STEP_ms) --test_with_wav $(WITH_MFCC) --use_power_spectrogram $(USE_POWER)
 
 test_accuracy_tflite:
-	python3 utils/test_accuracy_tflite.py --tflite_model $(TRAINED_TFLITE_MODEL) --dct_coefficient_count $(DCT_COUNT) --window_size_ms $(FRAME_SIZE_ms) --window_stride_ms $(FRAME_STEP_ms) --use_power_spectrogram $(USE_POWER)
+	python3 utils/test_accuracy_tflite.py --tflite_model $(TRAINED_MODEL) --dct_coefficient_count $(DCT_COUNT) --window_size_ms $(FRAME_SIZE_ms) --window_stride_ms $(FRAME_STEP_ms) --use_power_spectrogram $(USE_POWER)
 
 # all depends on the model
-all:: model mfcc_model
+all::  $(MFCCBUILD_DIR)/MFCCKernels.c model
 
-clean:: clean_model clean_mfcc_model
-
-clean_at_model:
-	$(RM) $(MODEL_GEN_EXE)
+clean:: clean_model clean_mfcc_code
 
 at_model_disp:: $(MODEL_BUILD) $(MODEL_GEN_EXE)
 	$(MODEL_GEN_EXE) -o $(MODEL_BUILD) -c $(MODEL_BUILD) $(MODEL_GEN_EXTRA_FLAGS) --debug=Disp
 
-at_model:: $(MODEL_BUILD) $(MODEL_GEN_EXE)
-	$(MODEL_GEN_EXE) -o $(MODEL_BUILD) -c $(MODEL_BUILD) $(MODEL_GEN_EXTRA_FLAGS)
-
 include common/model_rules.mk
-include mfcc_model.mk
-
 include $(GAP_SDK_HOME)/tools/rules/pmsis_rules.mk
