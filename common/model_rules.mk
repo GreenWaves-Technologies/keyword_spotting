@@ -13,21 +13,10 @@ else
   MODEL_TRAIN_FLAGS =
 endif
 
-ifdef MODEL_SQ8
-  CNN_GEN = $(MODEL_GEN_SQ8)
-  CNN_GEN_INCLUDE = $(MODEL_GEN_INCLUDE_SQ8)
-  CNN_LIB = $(MODEL_LIB_SQ8)
-  CNN_LIB_INCLUDE = $(MODEL_LIB_INCLUDE_SQ8)
-else
-  CNN_GEN = $(MODEL_GEN_POW2)
-  CNN_GEN_INCLUDE = $(MODEL_GEN_INCLUDE_POW2)
-  CNN_LIB = $(MODEL_LIB_POW2)
-  CNN_LIB_INCLUDE = $(MODEL_LIB_INCLUDE_POW2)
-endif
-
 USE_DISP=1
+
 ifdef USE_DISP
-  SDL_FLAGS= -lSDL2 -lSDL2_ttf
+  SDL_FLAGS= -lSDL2 -lSDL2_ttf -DAT_DISPLAY
 else
   SDL_FLAGS=
 endif
@@ -51,13 +40,12 @@ $(MODEL_BUILD):
 $(MODEL_TFLITE): $(TRAINED_TFLITE_MODEL) | $(MODEL_BUILD)
 	cp $< $@
 
-# Creates an Autotiler Model file by running the commands in the script
+# Creates an NNTOOL state file by running the commands in the script
 # These commands could be run interactively
 # The commands:
 # 	Adjust the model to match AutoTiler tensor order
 #	Fuse nodes together to match fused AutoTiler generators
-#	Quantize the graph if not already done with tflite quantization
-#	Generate the Autotiler model code
+#	Save the graph state files
 
 # Runs NNTOOL with its state file to generate the autotiler model code
 $(MODEL_BUILD)/$(MODEL_SRC): $(MODEL_TFLITE) | $(MODEL_BUILD) $(SAMPLES)
@@ -71,7 +59,7 @@ nntool_gen: $(MODEL_BUILD)/$(MODEL_SRC)
 # Build the code generator from the model code
 $(MODEL_GEN_EXE): $(CNN_GEN) $(MODEL_BUILD)/$(MODEL_SRC) $(EXTRA_GENERATOR_SRC) 
 	echo "COMPILING AUTOTILER MODEL"
-	gcc -g -o $(MODEL_GEN_EXE) -I. -I$(TILER_INC) -I$(TILER_EMU_INC) $(CNN_GEN_INCLUDE) $(CNN_LIB_INCLUDE) $? $(TILER_LIB) $(SDL_FLAGS)
+	gcc -g -o $(MODEL_GEN_EXE) -I. -I$(TILER_INC) -I$(TILER_EMU_INC) $(CNN_GEN_INCLUDE) $(CNN_LIB_INCLUDE) $^ $(TILER_LIB) $(SDL_FLAGS) 
 
 compile_model: $(MODEL_GEN_EXE)
 

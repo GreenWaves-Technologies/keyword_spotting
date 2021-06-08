@@ -30,6 +30,7 @@ else
 		ifeq ($(LARGE), 1)
 			MODEL_PREFIX = KWS_ds_cnn_l_quant
 			CFLAGS += -DLARGE
+			#LARGE_OPT = nodeoption 1 PARALLELFEATURES 0
 		else
 $(error You must set to 1 one of SMALL, MEDIUM, LARGE to select a network)
 		endif

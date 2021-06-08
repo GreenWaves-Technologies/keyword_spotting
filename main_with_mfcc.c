@@ -184,13 +184,6 @@ static void Runkws()
 
   if(rec_digit>1)
     printf("Recognized: %s\twith confidence: %d\n", LABELS[rec_digit], highest);
-
-#ifdef PERF
-    if (rec_digit!=8){
-        printf("App didn't recognize ON with %s test sample\n", WavName);
-        pmsis_exit(-1);
-    }
-#endif
 }
 
 
@@ -386,6 +379,10 @@ while(1)
         printf("%45s: Cycles: %10d, Operations: %10d, Operations/Cycle: %f\n", "Total", TotalCycles, TotalOper, ((float) TotalOper)/ TotalCycles);
         printf("\n");
         break;
+        if (rec_digit!=8){
+            printf("App didn't recognize ON with %s test sample\n", WavName);
+            pmsis_exit(-1);
+        }
     }
     #endif  /* PERF */
     AT_L1_FREE(0, __PREFIX(_L1_Memory), L1_SIZE);

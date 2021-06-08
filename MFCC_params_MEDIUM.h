@@ -7,6 +7,7 @@
 #define	USE_RADIX_4                   0
 #define	DATA_TYPE                     0
 #define	USE_POWER                     1
+#define	OUT_FFT                       0
 #define	MFCC_BANK_CNT                40
 #define	FMIN                       20.0
 #define	FMAX                     4000.0
