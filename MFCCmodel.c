@@ -8,7 +8,7 @@ void MFCCConfiguration(unsigned int L1Memory)
   SetInlineMode(ALWAYS_INLINE);
   SetSymbolDynamics();
 
-  SetUsedFilesNames(0, 3, "MfccBasicKernels.h", "CmplxFunctions.h", "PreProcessing.h");
+  SetUsedFilesNames(0, 1, "DSP_Lib.h");
   SetGeneratedFilesNames("MFCCKernels.c", "MFCCKernels.h");
 
   SetL1MemorySize(L1Memory);

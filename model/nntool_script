@@ -1,4 +1,5 @@
 set debug true
+qtune * option --hwc
 adjust
 fusions --scale8
 #show
