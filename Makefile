@@ -16,9 +16,7 @@ USE_EXT_CLK?=0
 WITH_MFCC ?= 1
 USE_POWER ?= 1
 USE_HIGH_PREC ?= 0
-SMALL  ?= 0
-MEDIUM ?= 0
-LARGE  ?= 0
+NN_TYPE  ?= SMALL
 DCT_COUNT = 10
 FRAME_SIZE_ms = 40
 FRAME_STEP_ms = 20
@@ -27,19 +25,17 @@ FRAME_STEP = 320
 AT_INPUT_WIDTH=10
 AT_INPUT_HEIGHT=49
 
-ifeq ($(SMALL), 1)
+ifeq ($(NN_TYPE), SMALL)
 	MODEL_PREFIX = KWS_ds_cnn_s_quant
 	APP_CFLAGS += -DSMALL
 else
-	ifeq ($(MEDIUM), 1)
+	ifeq ($(NN_TYPE), MEDIUM)
 		MODEL_PREFIX = KWS_ds_cnn_m_quant
 		APP_CFLAGS += -DMEDIUM
 	else
-		ifeq ($(LARGE), 1)
+		ifeq ($(NN_TYPE), LARGE)
 			MODEL_PREFIX = KWS_ds_cnn_l_quant
 			APP_CFLAGS += -DLARGE
-		else
-$(error You must set to 1 one of SMALL, MEDIUM, LARGE to select a network)
 		endif
 	endif
 endif
