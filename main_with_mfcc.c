@@ -147,9 +147,9 @@ static void RunMFCC(){
     #endif
     // run inference on inSig[0:WAV_BUFFER_SIZE] and inSig[WAV_BUFFER_SIZE/2:WAV_BUFER_SIZE*3/2] alternately
     #if (DATA_TYPE==1) //HIGH PRECISION 32BITS FFT
-    MFCC(inSig, mfcc_features, TwiddlesLUTR2, SwapTableR2, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, NORM, DCT_Coeff);
+    MFCC(inSig, mfcc_features, TwiddlesLUT, SwapTable, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, NORM, DCT_Coeff);
     #else //LOW PRECISION 16BITS FFT
-    MFCC(inSig, mfcc_features, TwiddlesLUTR2, RFFTTwiddlesLUT, SwapTableR2, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, NORM, DCT_Coeff);
+    MFCC(inSig, mfcc_features, TwiddlesLUT, RFFTTwiddlesLUT, SwapTable, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, NORM, DCT_Coeff);
     #endif
     #ifdef PERF
         elapsed = gap_cl_readhwtimer() - start;
@@ -369,7 +369,7 @@ while(1)
     {
         unsigned int TotalCycles = 0, TotalOper = 0;
         printf("\n");
-        for (int i=0; i<(sizeof(AT_GraphPerf)/sizeof(unsigned int)); i++) {
+        for (unsigned int i=0; i<(sizeof(AT_GraphPerf)/sizeof(unsigned int)); i++) {
             printf("%45s: Cycles: %10d, Operations: %10d, Operations/Cycle: %f\n", AT_GraphNodeNames[i],
                    AT_GraphPerf[i], AT_GraphOperInfosNames[i], ((float) AT_GraphOperInfosNames[i])/ AT_GraphPerf[i]);
             TotalCycles += AT_GraphPerf[i]; TotalOper += AT_GraphOperInfosNames[i];
