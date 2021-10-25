@@ -18,15 +18,15 @@
 #include "Gap.h"
 #ifdef SMALL
 	#include "KWS_ds_cnn_s_quantKernels.h"
-    #include "MFCC_params_SMALL.h"
+    #include "MFCC_params.h"
 #endif
 #ifdef MEDIUM
     #include "KWS_ds_cnn_m_quantKernels.h"
-    #include "MFCC_params_MEDIUM.h"
+    #include "MFCC_params.h"
 #endif
 #ifdef LARGE
 	#include "KWS_ds_cnn_l_quantKernels.h"
-    #include "MFCC_params_LARGE.h"
+    #include "MFCC_params.h"
 #endif
 #ifdef WITH_MFCC
     #include "gaplib/wavIO.h"
@@ -39,13 +39,14 @@
 
 #define  WAV_BUFFER_SIZE    16000 // Something more than 1sec@16kHz
 #define  NUM_CLASSES        12
+#define  N_FRAME            49
+#define  NORM               3
+#define  MFCC_Q             15-NORM-7
 
-/*
-    DCT_NORMALIZATION        -> np.sqrt(2/(N_DCT))*0.5
-    NNTOOL_INPUT_SCALE_FLOAT -> 1.9372712
-
-    SCALE = DCT_NORMALIZATION * 2**(-QDCT) / NNTOOL_INPUT_SCALE_FLOAT
-*/
+//DCT_NORMALIZATION        -> np.sqrt(2/(N_DCT))*0.5
+//NNTOOL_INPUT_SCALE_FLOAT -> 1.9372712
+// SCALE = DCT_NORMALIZATION*DCT_SCALE/NNTOOL_INPUT_SCALE_FLOAT
+// DCT_SCALE = 2**(-MFCC_Q)
 #define  INPUT_SCALE        236
 #define  INPUT_SCALEN       17
 
@@ -66,7 +67,11 @@ int rec_digit;
 static void RunMFCC(){
     L1_Memory = __PREFIX(_L1_Memory);
     PRINTF("Runnning MFCC\n");
-    MFCC(inSig, mfcc_features, 0, TwiddlesLUT, SwapLUT, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, 5, DCT_Coeff);
+    #if (DATA_TYPE==1) //HIGH PRECISION 32BITS FFT
+    MFCC(inSig, mfcc_features, TwiddlesLUTR2, SwapTableR2, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, NORM, DCT_Coeff);
+    #else //LOW PRECISION 16BITS FFT
+    MFCC(inSig, mfcc_features, TwiddlesLUTR2, RFFTTwiddlesLUT, SwapTableR2, WindowLUT, MFCC_FilterBank, MFCC_Coeffs, NORM, DCT_Coeff);
+    #endif
 }
 
 static void Runkws()

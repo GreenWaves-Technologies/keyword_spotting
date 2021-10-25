@@ -10,7 +10,7 @@ MODEL_PREFIX?=GapFlow
 
 MODEL_PYTHON=python3
 
-TRAINED_TFLITE_MODEL=model/$(MODEL_PREFIX).tflite
+MODEL_PATH = $(MODEL_BUILD)/$(MODEL_PREFIX).tflite
 MODEL_COMMON ?= common
 MODEL_COMMON_INC ?= $(GAP_SDK_HOME)/libs/gap_lib/include
 MODEL_COMMON_SRC ?= $(GAP_SDK_HOME)/libs/gap_lib/img_io
@@ -43,7 +43,6 @@ $(info script $(NNTOOL_SCRIPT))
 ifndef NNTOOL_SCRIPT
   NNTOOL_SCRIPT=model/nntool_script
 endif
-IMAGES = images
 RM=rm -f
 
 NNTOOL=nntool
