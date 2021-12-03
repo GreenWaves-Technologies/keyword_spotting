@@ -8,7 +8,7 @@ os:
     - pulpos
 chips: 
     - gap8
-    - gap9
+#    - gap9
 variants:
     std:
         name: standard
