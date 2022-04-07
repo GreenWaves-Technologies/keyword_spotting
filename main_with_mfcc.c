@@ -97,7 +97,7 @@ int prev = -1;
 
       // assume 256 samples in the buffer
       av_0 /= size;
-      
+
       av_00 -= av[0][idx_av];
       av_00 += av_0;
       av[0][idx_av] = av_0;
@@ -210,21 +210,22 @@ void kws_ds_cnn(void)
     // Force the DCDC to not go in PFM mode (less noisy)
     *(uint32_t *)0x1A10414C = 1;
 
-    // If you want to go slower and consume less power you need to force the FLL frequency 
-    // to be a multiple of the i2s CK (i.e. 2MHz). The pi_freq_set does not take care if 
+    // If you want to go slower and consume less power you need to force the FLL frequency
+    // to be a multiple of the i2s CK (i.e. 2MHz). The pi_freq_set does not take care if
     // this automatically.
     if (FREQ_FC==10)
         *(uint32_t *) 0x1A100004 = 0x94000FA0;
     if (FREQ_FC==20)
         *(uint32_t *) 0x1A100004 = 0x92000FA0;
 
-    printf("Set VDD voltage as %.2f, FC Frequency as %d MHz, CL Frequency = %d MHz\n", 
+    printf("Set VDD voltage as %.2f, FC Frequency as %d MHz, CL Frequency = %d MHz\n",
         (float)voltage/1000, FREQ_FC, FREQ_CL);
 
     printf("Entering main controller\n");
     /* Configure And open cluster. */
     struct pi_device cluster_dev;
     struct pi_cluster_conf cl_conf;
+    pi_cluster_conf_init(&cl_conf);
     cl_conf.id = 0;
     pi_open_from_conf(&cluster_dev, (void *) &cl_conf);
     if (pi_cluster_open(&cluster_dev))
@@ -232,7 +233,7 @@ void kws_ds_cnn(void)
         printf("Cluster open failed !\n");
         pmsis_exit(-4);
     }
-    
+
     ResOut        = (unsigned short int *) pi_l2_malloc(NUM_CLASSES             * sizeof(short int));
     ImageIn       = (char *)      pi_l2_malloc(AT_INPUT_WIDTH * AT_INPUT_HEIGHT * sizeof(char));
     mfcc_features = (short int *) pi_l2_malloc(N_FRAME * N_DCT                  * sizeof(short int));
@@ -277,7 +278,7 @@ void kws_ds_cnn(void)
 
         // Open the driver
         if (pi_i2s_open(&i2s))
-          pmsis_exit(1);  
+          pmsis_exit(1);
 
         // Start sampling, the driver will use the double-buffers we provided to store
         // the incoming samples
@@ -322,7 +323,7 @@ while(1)
             char FileName[100];
             sprintf(FileName, "../../../from_gap_%d_%s.wav", count, LABELS[rec_digit]);
             // run inference on inSig[0:WAV_BUFFER_SIZE] and inSig[WAV_BUFFER_SIZE/2:WAV_BUFER_SIZE*3/2] alternately
-            WriteWavToFile(FileName, i2s_conf.word_size, i2s_conf.frame_clk_freq, i2s_conf.channels, 
+            WriteWavToFile(FileName, i2s_conf.word_size, i2s_conf.frame_clk_freq, i2s_conf.channels,
                            (void *)inSig, WAV_BUFFER_SIZE * sizeof(short int));
         #endif
     #endif
@@ -377,7 +378,7 @@ while(1)
         printf("\n");
         printf("%45s: Cycles: %10d, Operations: %10d, Operations/Cycle: %f\n", "Total", TotalCycles, TotalOper, ((float) TotalOper)/ TotalCycles);
         printf("\n");
-        
+
         if (rec_digit!=8){
             printf("App didn't recognize ON with %s test sample\n", WavName);
             pmsis_exit(-1);

@@ -100,11 +100,12 @@ void kws_ds_cnn(void)
         printf("Failed to allocate Memory for Result (%d bytes)\n", 12*sizeof(KWS_IMAGE_IN_T));
         pmsis_exit(-3);
     }
-    
+
     #ifndef __EMUL__
         /* Configure And open cluster. */
         struct pi_device cluster_dev;
         struct pi_cluster_conf cl_conf;
+        pi_cluster_conf_init(&cl_conf);
         cl_conf.id = 0;
         pi_open_from_conf(&cluster_dev, (void *) &cl_conf);
         if (pi_cluster_open(&cluster_dev))
@@ -164,7 +165,7 @@ void kws_ds_cnn(void)
     __PREFIX(CNN_Destruct)();
     pi_l2_free(ResOut,12*sizeof(KWS_IMAGE_IN_T));
 
-    #ifndef __EMUL__    
+    #ifndef __EMUL__
         // Close the cluster
         pi_cluster_close(&cluster_dev);
     #endif
