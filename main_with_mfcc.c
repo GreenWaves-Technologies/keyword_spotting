@@ -227,6 +227,7 @@ void kws_ds_cnn(void)
     struct pi_cluster_conf cl_conf;
     pi_cluster_conf_init(&cl_conf);
     cl_conf.id = 0;
+    cl_conf.cc_stack_size = STACK_SIZE;
     pi_open_from_conf(&cluster_dev, (void *) &cl_conf);
     if (pi_cluster_open(&cluster_dev))
     {
@@ -337,11 +338,9 @@ while(1)
         __PREFIX(_L1_Memory) = (AT_L1_POINTER) AT_L1_ALLOC(0, L1_SIZE);
         if (__PREFIX(_L1_Memory) == 0) printf("Error reallocating L1\n");;
     }
-    struct pi_cluster_task task_mfcc = {0};
-    task_mfcc.entry = RunMFCC;
-    task_mfcc.arg = NULL;
-    task_mfcc.stack_size = (unsigned int) STACK_SIZE;
-    task_mfcc.slave_stack_size = SLAVE_STACK_SIZE;
+    struct pi_cluster_task task_mfcc;
+    pi_cluster_task(&task_mfcc, (void (*)(void *))&RunMFCC, NULL);
+    pi_cluster_task_stacks(&task_mfcc, NULL, SLAVE_STACK_SIZE);
     pi_cluster_send_task_to_cl(&cluster_dev, &task_mfcc);
 
     for (int i=0; i<N_FRAME; i++) {
@@ -358,11 +357,8 @@ while(1)
 	  pmsis_exit(-1);
 	}
 	//PRINTF("Stack size is %d and %d\n",STACK_SIZE,SLAVE_STACK_SIZE );
-	memset(task_net, 0, sizeof(struct pi_cluster_task));
-	task_net->entry = &Runkws;
-	task_net->stack_size = STACK_SIZE;
-	task_net->slave_stack_size = SLAVE_STACK_SIZE;
-	task_net->arg = NULL;
+    pi_cluster_task(task_net, (void (*)(void *))&Runkws, NULL);
+    pi_cluster_task_stacks(task_net, NULL, SLAVE_STACK_SIZE);
 	pi_cluster_send_task_to_cl(&cluster_dev, task_net);
 // pi_gpio_pin_write(&gpio_a1, gpio_out_a1, 0);
 
