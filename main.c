@@ -17,7 +17,6 @@
 #endif  /* __EMUL__ */
 
 /* Autotiler includes. */
-#include "Gap.h"
 #ifdef SMALL
 	#include "KWS_ds_cnn_s_quantKernels.h"
 #endif
