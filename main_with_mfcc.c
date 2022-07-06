@@ -46,6 +46,13 @@
 #define BUFF_SIZE (NB_ELEM*2)
 #define ITER    2
 
+#ifndef SILENT
+    #define PRINTF printf
+#else
+    #define PRINTF(...) ((void) 0)
+#endif
+
+
 static char *LABELS[NUM_CLASSES] = {"silence", "unknown", "yes", "no", "up", "down", "left", "right", "on", "off", "stop", "go"};
 L2_MEM unsigned short int *ResOut;
 char *WavName = NULL;
