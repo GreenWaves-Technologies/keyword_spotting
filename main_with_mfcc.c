@@ -143,7 +143,11 @@ int prev = -1;
 #endif
 
 static void RunMFCC(){
-    L1_Memory = __PREFIX(_L1_Memory);
+    #if defined(SMALL) && defined(GAP9)
+        L1_Memory = (AT_L1_POINTER) AT_L1_ALLOC(0, 60000);
+    #else
+        L1_Memory = __PREFIX(_L1_Memory);
+    #endif
     PRINTF("Runnning MFCC\n");
     #ifdef PERF
         gap_cl_starttimer();
@@ -162,6 +166,10 @@ static void RunMFCC(){
         elapsed = gap_cl_readhwtimer() - start;
         total_cyc += elapsed;
         printf("MFCC Total Cycles: %d Cycles/Frame %f \n\n\n", total_cyc, (float) total_cyc / N_FRAME);
+    #endif
+
+    #if defined(SMALL) && defined(GAP9)
+        AT_L1_FREE(0, L1_Memory, 60000);
     #endif
 }
 
@@ -212,10 +220,10 @@ void kws_ds_cnn(void)
     // Set voltage (not working with freertos)
     if (VOLTAGE != 1.2)
         PMU_set_voltage(voltage, 0);
-    #endif
-
     // Force the DCDC to not go in PFM mode (less noisy)
     *(uint32_t *)0x1A10414C = 1;
+    #endif
+
 
     // If you want to go slower and consume less power you need to force the FLL frequency
     // to be a multiple of the i2s CK (i.e. 2MHz). The pi_freq_set does not take care if
