@@ -10,6 +10,7 @@
 #include <sys/param.h>
 #include <string.h>
 #endif
+#include "Gap.h"
 
 #define __PREFIX(x) KWS_ds_cnn_m_quant ## x
 extern AT_HYPERFLASH_FS_EXT_ADDR_TYPE __PREFIX(_L3_Flash);

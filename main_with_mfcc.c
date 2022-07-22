@@ -46,6 +46,13 @@
 #define BUFF_SIZE (NB_ELEM*2)
 #define ITER    2
 
+#ifndef SILENT
+    #define PRINTF printf
+#else
+    #define PRINTF(...) ((void) 0)
+#endif
+
+
 static char *LABELS[NUM_CLASSES] = {"silence", "unknown", "yes", "no", "up", "down", "left", "right", "on", "off", "stop", "go"};
 L2_MEM unsigned short int *ResOut;
 char *WavName = NULL;
@@ -97,7 +104,7 @@ int prev = -1;
 
       // assume 256 samples in the buffer
       av_0 /= size;
-      
+
       av_00 -= av[0][idx_av];
       av_00 += av_0;
       av[0][idx_av] = av_0;
@@ -218,29 +225,31 @@ void kws_ds_cnn(void)
     #endif
 
 
-    // If you want to go slower and consume less power you need to force the FLL frequency 
-    // to be a multiple of the i2s CK (i.e. 2MHz). The pi_freq_set does not take care if 
+    // If you want to go slower and consume less power you need to force the FLL frequency
+    // to be a multiple of the i2s CK (i.e. 2MHz). The pi_freq_set does not take care if
     // this automatically.
     if (FREQ_FC==10)
         *(uint32_t *) 0x1A100004 = 0x94000FA0;
     if (FREQ_FC==20)
         *(uint32_t *) 0x1A100004 = 0x92000FA0;
 
-    printf("Set VDD voltage as %.2f, FC Frequency as %d MHz, CL Frequency = %d MHz\n", 
+    printf("Set VDD voltage as %.2f, FC Frequency as %d MHz, CL Frequency = %d MHz\n",
         (float)voltage/1000, FREQ_FC, FREQ_CL);
 
     printf("Entering main controller\n");
     /* Configure And open cluster. */
     struct pi_device cluster_dev;
     struct pi_cluster_conf cl_conf;
+    pi_cluster_conf_init(&cl_conf);
     cl_conf.id = 0;
+    cl_conf.cc_stack_size = STACK_SIZE;
     pi_open_from_conf(&cluster_dev, (void *) &cl_conf);
     if (pi_cluster_open(&cluster_dev))
     {
         printf("Cluster open failed !\n");
         pmsis_exit(-4);
     }
-    
+
     ResOut        = (unsigned short int *) pi_l2_malloc(NUM_CLASSES             * sizeof(short int));
     ImageIn       = (char *)      pi_l2_malloc(AT_INPUT_WIDTH * AT_INPUT_HEIGHT * sizeof(char));
     mfcc_features = (short int *) pi_l2_malloc(N_FRAME * N_DCT                  * sizeof(short int));
@@ -285,7 +294,7 @@ void kws_ds_cnn(void)
 
         // Open the driver
         if (pi_i2s_open(&i2s))
-          pmsis_exit(1);  
+          pmsis_exit(1);
 
         // Start sampling, the driver will use the double-buffers we provided to store
         // the incoming samples
@@ -330,7 +339,7 @@ while(1)
             char FileName[100];
             sprintf(FileName, "../../../from_gap_%d_%s.wav", count, LABELS[rec_digit]);
             // run inference on inSig[0:WAV_BUFFER_SIZE] and inSig[WAV_BUFFER_SIZE/2:WAV_BUFER_SIZE*3/2] alternately
-            WriteWavToFile(FileName, i2s_conf.word_size, i2s_conf.frame_clk_freq, i2s_conf.channels, 
+            WriteWavToFile(FileName, i2s_conf.word_size, i2s_conf.frame_clk_freq, i2s_conf.channels,
                            (void *)inSig, WAV_BUFFER_SIZE * sizeof(short int));
         #endif
     #endif
@@ -344,11 +353,9 @@ while(1)
         __PREFIX(_L1_Memory) = (AT_L1_POINTER) AT_L1_ALLOC(0, L1_SIZE);
         if (__PREFIX(_L1_Memory) == 0) printf("Error reallocating L1\n");;
     }
-    struct pi_cluster_task task_mfcc = {0};
-    task_mfcc.entry = RunMFCC;
-    task_mfcc.arg = NULL;
-    task_mfcc.stack_size = (unsigned int) STACK_SIZE;
-    task_mfcc.slave_stack_size = SLAVE_STACK_SIZE;
+    struct pi_cluster_task task_mfcc;
+    pi_cluster_task(&task_mfcc, (void (*)(void *))&RunMFCC, NULL);
+    pi_cluster_task_stacks(&task_mfcc, NULL, SLAVE_STACK_SIZE);
     pi_cluster_send_task_to_cl(&cluster_dev, &task_mfcc);
 
     for (int i=0; i<N_FRAME; i++) {
@@ -365,11 +372,8 @@ while(1)
 	  pmsis_exit(-1);
 	}
 	//PRINTF("Stack size is %d and %d\n",STACK_SIZE,SLAVE_STACK_SIZE );
-	memset(task_net, 0, sizeof(struct pi_cluster_task));
-	task_net->entry = &Runkws;
-	task_net->stack_size = STACK_SIZE;
-	task_net->slave_stack_size = SLAVE_STACK_SIZE;
-	task_net->arg = NULL;
+    pi_cluster_task(task_net, (void (*)(void *))&Runkws, NULL);
+    pi_cluster_task_stacks(task_net, NULL, SLAVE_STACK_SIZE);
 	pi_cluster_send_task_to_cl(&cluster_dev, task_net);
 // pi_gpio_pin_write(&gpio_a1, gpio_out_a1, 0);
 
@@ -385,7 +389,7 @@ while(1)
         printf("\n");
         printf("%45s: Cycles: %10d, Operations: %10d, Operations/Cycle: %f\n", "Total", TotalCycles, TotalOper, ((float) TotalOper)/ TotalCycles);
         printf("\n");
-        
+
         if (rec_digit!=8){
             printf("App didn't recognize ON with %s test sample\n", WavName);
             pmsis_exit(-1);

@@ -17,7 +17,6 @@
 #endif  /* __EMUL__ */
 
 /* Autotiler includes. */
-#include "Gap.h"
 #ifdef SMALL
 	#include "KWS_ds_cnn_s_quantKernels.h"
 #endif
@@ -100,12 +99,14 @@ void kws_ds_cnn(void)
         printf("Failed to allocate Memory for Result (%d bytes)\n", 12*sizeof(KWS_IMAGE_IN_T));
         pmsis_exit(-3);
     }
-    
+
     #ifndef __EMUL__
         /* Configure And open cluster. */
         struct pi_device cluster_dev;
         struct pi_cluster_conf cl_conf;
+        pi_cluster_conf_init(&cl_conf);
         cl_conf.id = 0;
+        cl_conf.cc_stack_size = STACK_SIZE;
         pi_open_from_conf(&cluster_dev, (void *) &cl_conf);
         if (pi_cluster_open(&cluster_dev))
         {
@@ -137,11 +138,8 @@ void kws_ds_cnn(void)
 		  pmsis_exit(-1);
 		}
 		printf("Stack size is %d and %d\n",STACK_SIZE,SLAVE_STACK_SIZE );
-		memset(task, 0, sizeof(struct pi_cluster_task));
-		task->entry = &Runkws;
-		task->stack_size = STACK_SIZE;
-		task->slave_stack_size = SLAVE_STACK_SIZE;
-		task->arg = NULL;
+        pi_cluster_task(task, (void (*)(void *))&Runkws, NULL);
+        pi_cluster_task_stacks(task, NULL, SLAVE_STACK_SIZE);
 		pi_cluster_send_task_to_cl(&cluster_dev, task);
 	#else
 	    Runkws();
@@ -164,7 +162,7 @@ void kws_ds_cnn(void)
     __PREFIX(CNN_Destruct)();
     pi_l2_free(ResOut,12*sizeof(KWS_IMAGE_IN_T));
 
-    #ifndef __EMUL__    
+    #ifndef __EMUL__
         // Close the cluster
         pi_cluster_close(&cluster_dev);
     #endif
