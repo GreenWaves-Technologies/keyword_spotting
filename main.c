@@ -132,7 +132,7 @@ void kws_ds_cnn(void)
 	    // task.stack_size = (unsigned int) STACK_SIZE;
 	    // pi_cluster_send_task_to_cl(&cluster_dev, &task);
 
-		struct pi_cluster_task *task = pmsis_l2_malloc(sizeof(struct pi_cluster_task));
+		struct pi_cluster_task *task = pi_l2_malloc(sizeof(struct pi_cluster_task));
 		if(task==NULL) {
 		  printf("pi_cluster_task alloc Error!\n");
 		  pmsis_exit(-1);
