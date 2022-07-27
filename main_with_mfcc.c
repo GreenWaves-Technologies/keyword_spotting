@@ -366,7 +366,7 @@ while(1)
     }
 
     PRINTF("Call cluster\n");
-	struct pi_cluster_task *task_net = pmsis_l2_malloc(sizeof(struct pi_cluster_task));
+	struct pi_cluster_task *task_net = pi_l2_malloc(sizeof(struct pi_cluster_task));
 	if(task_net==NULL) {
 	  printf("pi_cluster_task alloc Error!\n");
 	  pmsis_exit(-1);
