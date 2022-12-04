@@ -287,7 +287,7 @@ void kws_ds_cnn(void)
         i2s_conf.itf = 0;
         i2s_conf.channels = 1;
         i2s_conf.format = PI_I2S_FMT_DATA_FORMAT_PDM;
-        i2s_conf.word_size = 16;
+        i2s_conf.slot_width = 16;
         i2s_conf.pdm_decimation = 128; // --> 16kHz * 128 = 2.048MHz
 
         pi_open_from_conf(&i2s, &i2s_conf);
@@ -339,7 +339,7 @@ while(1)
             char FileName[100];
             sprintf(FileName, "../../../from_gap_%d_%s.wav", count, LABELS[rec_digit]);
             // run inference on inSig[0:WAV_BUFFER_SIZE] and inSig[WAV_BUFFER_SIZE/2:WAV_BUFER_SIZE*3/2] alternately
-            WriteWavToFile(FileName, i2s_conf.word_size, i2s_conf.frame_clk_freq, i2s_conf.channels,
+            WriteWavToFile(FileName, i2s_conf.slot_width, i2s_conf.frame_clk_freq, i2s_conf.channels,
                            (void *)inSig, WAV_BUFFER_SIZE * sizeof(short int));
         #endif
     #endif
