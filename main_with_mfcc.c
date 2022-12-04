@@ -285,8 +285,8 @@ void kws_ds_cnn(void)
         i2s_conf.block_size = NB_ELEM*sizeof(short);
         i2s_conf.frame_clk_freq = 16000;
         i2s_conf.itf = 0;
+        i2s_conf.mode = PI_I2S_MODE_PDM;
         i2s_conf.channels = 1;
-        i2s_conf.format = PI_I2S_FMT_DATA_FORMAT_PDM;
         i2s_conf.slot_width = 16;
         i2s_conf.pdm_decimation = 128; // --> 16kHz * 128 = 2.048MHz
 
