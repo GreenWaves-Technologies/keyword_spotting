@@ -72,8 +72,8 @@ int prev = -1;
     static uint16_t buff[2][NB_ELEM];
     static struct pi_device i2s;
     static int end = 0;
-    static pi_task_t task;
-    static pi_task_t ready_to_process;
+    static pi_evt_t task;
+    static pi_evt_t ready_to_process;
     static short *chunk;
     #define LENGTH_AV 32
     #define SHL 3
