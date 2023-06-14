@@ -1,19 +1,17 @@
 name: starters_keyword_spotting
-boards: []
-platforms: 
-    - board
-    - gvsoc
-os: 
-    - freertos
-    - pulpos
-chips: 
-    - gap8
-#    - gap9
 variants:
-    std:
-        name: standard
-        tags:
-            - integration
-            - release
-        duration: standard
+    gvsoc:
+        chip: gap8 # Not implemented on GAP9
+        board: gap9evk
+        platform: gvsoc
+        os: freertos
+        builder: make
+        flags: ~
+
+    board:
+        chip: gap8 # Not implemented on GAP9
+        board: gap9evk
+        platform: board
+        os: freertos
+        builder: make
         flags: ~
